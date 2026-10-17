@@ -21,10 +21,12 @@ class LocalReporter {
     });
   }
   onEnd(result) {
-    const errorMessages = [...this.errors, ...this.tests.flatMap(test => test.errors)];
+    const isControlStop = message => !!process.env.LOCAL_CHECK_INJECT
+      && /^Testing stopped early after \d+ maximum allowed failures\.$/.test(message.replace(/\x1b\[[0-9;]*m/g, '').trim());
+    const errorMessages = [...this.errors, ...this.tests.flatMap(test => test.errors)].filter(message => !isControlStop(message));
     const messages = errorMessages.join('\n');
     let status = result.status === 'passed' && this.total > 0 && this.tests.length === this.total
-      && this.tests.every(test => test.status === 'passed' && test.attachments.some(a => a.contentType === 'image/png'))
+      && this.tests.every(test => test.status === 'passed' && test.attachments.some(a => a.contentType === 'image/png' && a.sha256))
       ? 'passed' : 'failed';
     if (!this.total) status = 'blocked';
     else if (errorMessages.some(message => !/BASELINE_PENDING|ENV_BLOCKED/.test(message))) status = 'failed';
