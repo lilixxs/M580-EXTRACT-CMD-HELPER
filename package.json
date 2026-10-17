@@ -7,7 +7,8 @@
     "build": "node scripts/build.cjs",
     "test": "npm run build && playwright test",
     "verify": "npm run check && npm test",
-    "test:local": "node scripts/local-check.cjs"
+    "test:local": "node scripts/local-check.cjs",
+    "test:local:negative": "node tests/local/support/negative-controls.cjs"
   },
   "engines": {
     "node": ">=22"

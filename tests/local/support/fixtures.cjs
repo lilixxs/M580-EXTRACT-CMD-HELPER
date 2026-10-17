@@ -73,6 +73,13 @@ async function assertApprovedBaseline(testInfo) {
   const current = JSON.parse(fs.readFileSync(path.join(laneDir, `environment-${testInfo.project.name}.json`), 'utf8'));
   if (!approved.approvedBy || !approved.approvedAt || !approved.approvalNote) throw new Error('BASELINE_PENDING: approval record missing');
   if (approved.environmentHash !== current.environmentHash) throw new Error('ENV_BLOCKED: baseline environment changed');
+  const expectedPaths = ['chromium-1280x800', 'chromium-1024x768'].flatMap(project =>
+    ['default', 'nelem-custom-invalid', 'truncation', 'long-name'].map(name => `${project}/${name}.png`));
+  const approvedPaths = (approved.files || []).map(item => item.path);
+  if (approvedPaths.length !== 8 || new Set(approvedPaths).size !== 8
+    || !expectedPaths.every(file => approvedPaths.includes(file))) {
+    throw new Error('BASELINE_PENDING: the eight approved baseline paths must exactly match the frozen matrix');
+  }
   for (const item of approved.files || []) {
     const relative = item.path;
     if (typeof relative !== 'string' || relative.includes('..') || path.isAbsolute(relative)) throw new Error('ENV_BLOCKED: invalid baseline path');
@@ -80,7 +87,6 @@ async function assertApprovedBaseline(testInfo) {
     if (!fs.existsSync(file)) throw new Error(`BASELINE_PENDING: baseline missing: ${relative}`);
     if (hash(fs.readFileSync(file)) !== item.sha256) throw new Error(`ENV_BLOCKED: baseline hash changed: ${relative}`);
   }
-  if (approved.files?.length !== 8) throw new Error('BASELINE_PENDING: exactly eight approved baselines required');
 }
 
 const test = base.extend({

@@ -6,6 +6,7 @@ const { spawn, execFileSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const ports = { functional: 4181, layout: 4182, visual: 4183 };
+const caseCounts = { functional: 16, layout: 12, visual: 8 };
 const hash = buffer => crypto.createHash('sha256').update(buffer).digest('hex');
 const args = process.argv.slice(2);
 const options = {};
@@ -62,7 +63,7 @@ async function runLane(lane) {
       LOCAL_CHECK_PORT: String(ports[lane]), LOCAL_CHECK_MODE: summary.mode,
       LOCAL_CHECK_INJECT: options.inject || ''
     };
-    let code = await command(process.execPath, [npmCli, 'ci', '--registry=https://registry.npmjs.org', '--no-audit', '--no-fund'], worktree, env, log);
+    let code = await command(process.execPath, [npmCli, 'ci', '--offline', '--ignore-scripts', '--registry=https://registry.npmjs.org', '--no-audit', '--no-fund'], worktree, env, log);
     if (code !== 0) throw new Error(`ENV_BLOCKED: npm ci failed with exit ${code}`);
     code = await command(process.execPath, ['scripts/build.cjs'], worktree, env, log);
     if (code !== 0) throw new Error(`ENV_BLOCKED: build failed with exit ${code}`);
@@ -78,6 +79,10 @@ async function runLane(lane) {
     const report = JSON.parse(fs.readFileSync(path.join(output, lane, 'lane-result.json'), 'utf8'));
     result.status = report.status;
     result.total = report.total;
+    if (report.total !== caseCounts[lane]) {
+      result.status = 'blocked';
+      result.error = `Expected ${caseCounts[lane]} cases; collected ${report.total}`;
+    }
     result.report = `${lane}/html/index.html`;
     result.result = `${lane}/lane-result.json`;
     if (result.status === 'passed' && code !== 0) result.status = 'failed';
@@ -86,6 +91,17 @@ async function runLane(lane) {
     if (result.status === 'passed' && manifests.length !== 2) {
       result.status = 'blocked';
       result.error = 'Missing viewport environment manifests';
+    }
+    if (lane === 'visual' && options.candidates && result.status === 'baseline-pending') {
+      const candidates = [];
+      for (const project of ['chromium-1280x800', 'chromium-1024x768']) {
+        for (const name of ['default', 'nelem-custom-invalid', 'truncation', 'long-name']) {
+          const file = path.join(output, lane, 'baseline-candidates', project, `${name}.png`);
+          if (fs.existsSync(file)) candidates.push({ path: path.relative(output, file), sha256: hash(fs.readFileSync(file)) });
+        }
+      }
+      result.candidates = candidates;
+      if (candidates.length !== 8) { result.status = 'blocked'; result.error = 'Eight candidate images are required'; }
     }
   } catch (error) {
     result.error = error.message;

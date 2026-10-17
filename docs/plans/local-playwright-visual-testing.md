@@ -2,7 +2,7 @@
 
 ## Steps
 
-- [ ] 基础设施：协调 agent 独占改动 serve/config/编排入口，跑通单 lane 冒烟。
+- [x] 基础设施：协调 agent 独占改动 serve/config/编排入口，跑通单 lane 冒烟。
 - [ ] 并行套件：3 条 lane 在独立 worktree、独立端口、独立产物目录下并行通过。
 - [ ] 基线审核与负例：生成 8 张候选基线交用户审批冻结；5 类负例全部检出。
 - [ ] 整合验收：现有 `npm run verify` 9 项不受影响，汇总产物与 manifest 齐全，3 次同环境一致。

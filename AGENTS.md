@@ -34,6 +34,7 @@ npm run verify
 
 - `npm run verify` 先执行 HTML 结构与内联 JS 语法检查，再运行 `npm test`。后者自动重建发布产物，并启动仅监听本机的 4173 端口测试服务器。
 - 单项命令为 `npm run check`、`npm run build`、`npm test`。聚焦用例可用 `npm test -- --grep "SRC_POS 越界"`。
+- 涉及本地 Playwright 多 lane 检测（`npm run test:local`）或截图基线时，先读 README 的“本地检测运行”一节。
 - Chromium 回归在 `dist/index.html` 上执行。测试隔离 Tailwind CDN，只覆盖功能与 ST 输出，不覆盖样式、剪贴板或 PLC 通讯。
 - 当前 EXTRACT 默认示例：源为 10 个 WORD，目标为 20 个 WORD，SRC_POS=2、DST_POS=5、CPY_NELEM=3。预期元素大小为 2 字节，目标容量为 20，状态为“参数有效 · 就绪”。
 - 修改 EXTRACT 模型后，检查 SRC_NELEM 不整除、源位置越界、目标截断、复制数为 0、变量表达式及重置。ST 输入使用 `:=`，输出 DST/ERR 使用 `=>`。

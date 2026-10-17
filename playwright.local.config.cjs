@@ -8,6 +8,7 @@ module.exports = defineConfig({
   testMatch: '**/*.local.cjs',
   workers: 1,
   retries: 0,
+  maxFailures: process.env.LOCAL_CHECK_INJECT ? 1 : 0,
   forbidOnly: true,
   timeout: 30_000,
   globalTimeout: 180_000,
