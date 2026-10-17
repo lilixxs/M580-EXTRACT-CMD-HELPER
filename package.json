@@ -6,7 +6,8 @@
     "check": "node scripts/check.cjs",
     "build": "node scripts/build.cjs",
     "test": "npm run build && playwright test",
-    "verify": "npm run check && npm test"
+    "verify": "npm run check && npm test",
+    "test:local": "node scripts/local-check.cjs"
   },
   "engines": {
     "node": ">=22"
