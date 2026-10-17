@@ -2,7 +2,7 @@
 
 > 语言 / Language：[中文](#中文) · [English](#english)
 
-远端仓库已更名为 `M580-EXTRACT-CMD-HELPER`：<https://github.com/lilixxs/M580-EXTRACT-CMD-HELPER>
+仓库 `M580-EXTRACT-CMD-HELPER`：<https://github.com/lilixxs/M580-EXTRACT-CMD-HELPER>
 
 ---
 
