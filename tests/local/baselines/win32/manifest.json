@@ -1,7 +1,7 @@
 {
   "approvedBy": "user",
   "approvedAt": "2026-10-17T23:30:06.302Z",
-  "approvalNote": "??????????????? 8 ???????????????????",
+  "approvalNote": "User explicitly approved all eight candidate images in this session. Verified candidates match the reviewed PNG bytes.",
   "reviewedRunId": "initial-candidates",
   "verifiedRunId": "reviewed-candidates",
   "sourceCommit": "b1f3942e60435b7a406eafdfa7e8c20289047ed5",
