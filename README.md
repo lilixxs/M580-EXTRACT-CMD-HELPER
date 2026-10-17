@@ -36,15 +36,18 @@ npm run verify
 - 仅支持 Windows；要求工作区干净且实现已 commit（每 lane 在 `LOCALAPPDATA/Temp/opencode` 自动创建同 commit 的 detached 临时 worktree，独立 npm ci、dist 与端口 4181/4182/4183，worktree 保留不自动删除）。
 - 前置 `npm ci` 与 `npx playwright install chromium` 需用户先执行；当前不自动安装浏览器。
 - 临时 worktree 通过 `npm ci --offline --ignore-scripts` 使用已有 npm 缓存。缓存缺失时报环境受阻，不在检测过程中联网补装。浏览器只允许本机请求与固定样式 fixture 回放。
-- 首次正式 visual 基线尚不存在，正常比较返回 pending，不能绿。`npm run test:local -- --candidates` 返回 3 并生成 8 张候选截图，须用户逐张确认后才可作为基线；`--inject`（bad-st 等）仅用于预期失败控制，不可作为正常通过记录。
+- 正式基线含用户已确认的 8 张截图及审批记录。只有与基线一致的 OS、字体、浏览器和样式环境才执行比较；缺失基线返回待审，环境变化返回受阻。
+- `npm run test:local -- --candidates` 返回 3 并生成 8 张候选图，不更新正式基线。更新前须取得用户确认；`--inject`（bad-st 等）仅用于预期失败控制，不可作为正常通过记录。
 - 退出码：0 通过 / 1 断言失败 / 2 环境受阻 / 3 基线待审。
 - 不同操作系统渲染结果不同，不能跨 OS 共用基线。
 - 检测不会自动更新基线或放宽阈值；产物在 `artifacts/local-check/<runId>/`。
-- 本轮尚未执行首次基线人审与 3 次比较验证，也未合并推送；不要据此宣称整套检测已通过。
+- 以本次 `summary.json` 为运行结论。历史通过记录不能替代当前环境的检测。
 
 聚焦运行：`npm run test:local -- --lane functional`，lane 可选 `functional`、`layout`、`visual`。`--run-id <名称>` 可固定本次证据目录，名称不可重复。
 
 `npm run test:local:negative` 验证坏 ST、控件偏移、样式缺失、端口占用和基线缺失这 5 类负例。该命令返回 0 只表示检测器正确拒绝负例，不表示产品通过。
+
+`npm run test:local:reporter` 快速检查汇总分类，包括环境受阻、基线待审和真实断言失败。
 
 ## 发布（GitHub Actions / Pages）
 
@@ -58,6 +61,6 @@ npm run verify
 
 ## 验证边界
 
-- Playwright 回归隔离 Tailwind CDN，覆盖功能与 ST 输出，不验证样式或剪贴板。
+- 默认 `npm run verify` 隔离 Tailwind CDN，只测功能与 ST 输出。本地检测另测真实样式、布局与截图，剪贴板路径使用 mock，不验证系统剪贴板内容。
 - PLC 通讯与程序段可编译性须在 Control Expert 或实际 PLC 环境验证。
 - 无 lint 与 typecheck 配置。

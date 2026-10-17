@@ -1,0 +1,68 @@
+{
+  "approvedBy": "user",
+  "approvedAt": "2026-10-17T23:30:06.302Z",
+  "approvalNote": "??????????????? 8 ???????????????????",
+  "reviewedRunId": "initial-candidates",
+  "verifiedRunId": "reviewed-candidates",
+  "sourceCommit": "b1f3942e60435b7a406eafdfa7e8c20289047ed5",
+  "sourceSha256": "6502867bfc1daa4852a52224effd17e2a0efd4a8523645c76100304ffdce0bb6",
+  "environment": {
+    "platform": "win32",
+    "osRelease": "10.0.26200",
+    "osVersion": "Windows 11 Pro",
+    "node": "v22.23.2",
+    "playwright": "1.64.1",
+    "browser": "156.0.8078.4",
+    "fonts": {
+      "count": 562,
+      "inventoryHash": "ab06331d720372cdfbf047a989aae86179e1168033ed473dae03c1a21831b203"
+    },
+    "styleSha256": "176e894661aa9cdc9a5cba6c720044cbbf7b8bd80d1c9a142a7c24b1b6c50d15",
+    "dpr": 1,
+    "locale": "zh-CN",
+    "colorScheme": "light"
+  },
+  "environmentHash": "2accc2b9d8a53adaa28eadc1ac5afa062638743bea7771d14f3662f7b607d95b",
+  "files": [
+    {
+      "path": "chromium-1280x800/default.png",
+      "sha256": "caa2a04d2744730d34a867b39eb7634cfb56a2e19a468fbe6ac7eced764af167",
+      "bytes": 298859
+    },
+    {
+      "path": "chromium-1280x800/nelem-custom-invalid.png",
+      "sha256": "d15ad6b48141d57cd3e4a931b5916f19bb5afe81c1c02f183645db747f5afa79",
+      "bytes": 297682
+    },
+    {
+      "path": "chromium-1280x800/truncation.png",
+      "sha256": "f701026aa660d1a482809745ceba573d42da17b332b1cf6fda55b71b030c16ef",
+      "bytes": 303984
+    },
+    {
+      "path": "chromium-1280x800/long-name.png",
+      "sha256": "38461d430450ec537049e5dc24941b882bb9929dce3279746c6cd634f3df0193",
+      "bytes": 333059
+    },
+    {
+      "path": "chromium-1024x768/default.png",
+      "sha256": "dc02a77598ff5aa700f41df272cc2b95f3e853916905b32aa6600dc50410b342",
+      "bytes": 294218
+    },
+    {
+      "path": "chromium-1024x768/nelem-custom-invalid.png",
+      "sha256": "846ee9e73a3d6c878f31d64dc72b0701058982e83278734d18af3ae048b0dd39",
+      "bytes": 293818
+    },
+    {
+      "path": "chromium-1024x768/truncation.png",
+      "sha256": "8742d14c59d10ccec90090eb2690929a35a364eb911fa51407c781a22df00b79",
+      "bytes": 298759
+    },
+    {
+      "path": "chromium-1024x768/long-name.png",
+      "sha256": "f896090129ddf9aba6ff51cb8479341082e9ea085fdfa0bd63a0b0db37919392",
+      "bytes": 328688
+    }
+  ]
+}
