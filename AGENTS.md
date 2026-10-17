@@ -15,28 +15,26 @@
 - `claude_code_light_ui_style_guide.md` 描述直角、陶土橙风格，与当前 HTML 的圆角、stone/sky 风格不同。仅在任务要求应用该指南时切换样式。
 
 ## 当前页面的修改边界
-- HTML、CSS 和原生 JS 均位于 `INDEX.html`。页面从 Tailwind CDN 加载样式，完整外观依赖网络。当前没有包管理、构建、lint、typecheck、测试或 CI 配置。
+- HTML、CSS 和原生 JS 均位于 `INDEX.html`。页面从 Tailwind CDN 加载样式，完整外观依赖外网。
+- 应用源码只编辑 `INDEX.html`。`npm run build` 清空 `dist/` 并复制生成 `dist/index.html`。不要反向编辑发布产物。
+- CI 工作流 `pages.yml` 依次执行 `npm ci`、`npx playwright install --with-deps chromium`、`npm run verify`，测试对象是当前 EXTRACT 页面，不是 ADDM/ADDMX 需求。push 到 `main` 且检查通过后才上传 `dist` 并部署 Pages；PR 只跑检查，不部署。
 - 输入事件调用 `render()`。`buildModel()` 汇总模型，随后各 `render*()` 更新界面，`genST()` 生成 ST。修改计算规则时，同步检查校验、功能块图、声明表、内存示意图和引脚表。
 - EXTRACT 的元素大小由源字节数除以 SRC_NELEM 得出。目标容量由目标字节数除以该元素大小得出，不一定等于目标数组元素数。
 - SRC_POS/DST_POS 是从 0 开始的元素偏移，不是数组声明下标。非整数文本当前按运行时表达式处理。修改校验时保留这一区别。
 - `TYPE_SIZES` 是页面估算表，不是所有 PLC 平台的内存布局保证。
 
 ## 验证
-- 在浏览器中直接打开 `INDEX.html`。无需安装依赖或运行构建。
-- 在项目根目录用 PowerShell 执行以下检查。它只检查内联 JS 语法，不执行 DOM 逻辑：
+- 浏览器直接打开 `INDEX.html` 可快速查看外观与交互。完整验证需要 Node >= 22，在项目根目录执行：
 
-```powershell
-@'
-const fs = require('node:fs');
-const vm = require('node:vm');
-const html = fs.readFileSync('INDEX.html', 'utf8');
-const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].filter(m => !/\bsrc\s*=/i.test(m[1]));
-if (!scripts.length) throw new Error('No inline scripts found');
-scripts.forEach((m, i) => new vm.Script(m[2], { filename: `INDEX.html:inline-${i + 1}` }));
-console.log(`Syntax OK: ${scripts.length} inline script(s)`);
-'@ | node
+```bash
+npm ci
+npx playwright install chromium
+npm run verify
 ```
 
+- `npm run verify` 先执行 HTML 结构与内联 JS 语法检查，再运行 `npm test`。后者自动重建发布产物，并启动仅监听本机的 4173 端口测试服务器。
+- 单项命令为 `npm run check`、`npm run build`、`npm test`。聚焦用例可用 `npm test -- --grep "SRC_POS 越界"`。
+- Chromium 回归在 `dist/index.html` 上执行。测试隔离 Tailwind CDN，只覆盖功能与 ST 输出，不覆盖样式、剪贴板或 PLC 通讯。
 - 当前 EXTRACT 默认示例：源为 10 个 WORD，目标为 20 个 WORD，SRC_POS=2、DST_POS=5、CPY_NELEM=3。预期元素大小为 2 字节，目标容量为 20，状态为“参数有效 · 就绪”。
 - 修改 EXTRACT 模型后，检查 SRC_NELEM 不整除、源位置越界、目标截断、复制数为 0、变量表达式及重置。ST 输入使用 `:=`，输出 DST/ERR 使用 `=>`。
-- 浏览器验证覆盖布局、交互和剪贴板回退。PLC 程序段是否可编译、可通讯，须另在 Control Expert 或实际 PLC 环境验证。
+- 修改布局或复制逻辑后，另做浏览器人工检查。PLC 程序段是否可编译、可通讯，须在 Control Expert 或实际 PLC 环境验证。
