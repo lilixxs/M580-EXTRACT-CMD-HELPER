@@ -4,343 +4,582 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EXTRACT 指令生成工具</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 纯内联 CSS：离线自包含，不加载任何外部资源 -->
   <style>
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    /* PLC 功能块风格 */
-    .plc-block { border: 2px solid #1c1917; position: relative; background: #ffffff; }
-    .plc-pin-in::before { content: ''; position: absolute; left: -18px; top: 50%; width: 14px; height: 2px; background: #44403c; }
-    .plc-pin-out::after { content: ''; position: absolute; right: -18px; top: 50%; width: 14px; height: 2px; background: #0284c7; }
-    /* 存储器映射条 */
-    .mm-bar { display: flex; height: 20px; border: 1px solid #d6d3d1; border-radius: 6px; overflow: hidden; background: #fafaf9; }
-    .mm-bar .cell { flex: 1; border-right: 1px solid #e7e5e4; }
+    /* ===== 设计令牌：Claude Code 浅色直角风格 ===== */
+    :root {
+      --bg-canvas: #FAF9F5; --bg-surface: #FFFFFF; --bg-subtle: #F3F1EA; --bg-input: #FCFBF9;
+      --bg-hover: #F7F5EE; --bg-bar: #F8F6F0;
+      --border-soft: #E5E2D8; --border-strong: #CFCAC0;
+      --accent-clay: #D97757; --accent-clay-dark: #BE5B3B; --accent-clay-tint: #FDF3EF;
+      --accent-focus-ring: rgba(217, 119, 87, 0.18);
+      --text-primary: #141413; --text-secondary: #5C5A54; --text-muted: #8C887E;
+      --success-text: #28663B; --success-bg: #EBF5EE; --success-border: #C0E0C8;
+      --error-text: #B83525; --error-bg: #FDECE9; --error-border: #F3C2BA;
+      --warn-text: #9E4B24; --warn-bg: #FDF2EB; --warn-border: #F2CFC0;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    }
+    /* 全局直角几何；组件使用独立 class */
+    *, *::before, *::after { box-sizing: border-box; border-radius: 0; }
+    body {
+      margin: 0; padding: 48px 32px 64px; background: var(--bg-canvas); color: var(--text-primary);
+      font-family: var(--font-sans); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, h4, p, ul { margin: 0; padding: 0; }
+    svg { display: block; }
+    .wrap { width: 100%; max-width: 980px; margin: 0 auto; }
+    .mono { font-family: var(--font-mono); }
+    .mt { margin-top: 14px; }
+    /* JS 用 classList 切换 .hidden；!important 确保不被 display 规则覆盖 */
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+
+    /* ===== 页头 ===== */
+    .page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+      gap: 12px 24px; padding-bottom: 20px; margin-bottom: 28px; border-bottom: 1px solid var(--border-soft); }
+    .page-head__left { min-width: 0; }
+    .tag { display: inline-block; margin-bottom: 10px; padding: 2px 8px; background: var(--bg-subtle);
+      border: 1px solid var(--border-soft); font-family: var(--font-mono); font-size: 11.5px;
+      font-weight: 600; letter-spacing: 0.04em; color: var(--text-secondary); }
+    .tag b { color: var(--accent-clay-dark); }
+    .page-title { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+    .page-sub { margin-top: 6px; font-size: 13px; color: var(--text-secondary); }
+    .status { display: inline-block; padding: 4px 10px; border: 1px solid; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .status--pass { color: var(--success-text); background: var(--success-bg); border-color: var(--success-border); }
+    .status--warn { color: var(--warn-text); background: var(--warn-bg); border-color: var(--warn-border); }
+    .status--fail { color: var(--error-text); background: var(--error-bg); border-color: var(--error-border); }
+
+    /* ===== 卡片 / 分组 / 字段栅格 ===== */
+    .card { margin-bottom: 24px; background: var(--bg-surface); border: 1px solid var(--border-strong); }
+    .card__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--border-soft); }
+    .card__title { font-size: 15px; font-weight: 650; }
+    .card__body { padding: 20px 24px; }
+    .block { margin-bottom: 24px; }
+    .block:last-child { margin-bottom: 0; }
+    .sep { display: block; margin-bottom: 12px; padding: 8px 24px; background: var(--bg-bar);
+      border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft);
+      font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em; color: var(--text-secondary); }
+    .panel { padding: 14px; background: var(--bg-subtle); border: 1px solid var(--border-soft); }
+    .sub-title { margin-bottom: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+      letter-spacing: 0.04em; color: var(--text-secondary); }
+    .cfg { display: flex; flex-wrap: wrap; gap: 14px 18px; }
+    .field { flex: 1 1 220px; min-width: 0; }
+    .field--seg { flex: 1 1 260px; }
+    .field--num { flex: 0 0 112px; width: 112px; }
+    .field--narrow { flex: 0 0 160px; width: 160px; }
+    .field--tight { width: 192px; max-width: 100%; }
+    .field--single { flex: 0 1 320px; }
+    .field--err { flex: 0 1 448px; width: 100%; max-width: 448px; }
+
+    /* ===== 标签 / 提示 / 输入控件 ===== */
+    .label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+    .hint { margin-bottom: 6px; font-size: 11.5px; line-height: 1.35; color: var(--text-muted); }
+    .hint--mono { margin: 6px 0 0; min-height: 1rem; font-family: var(--font-mono); font-size: 12px;
+      color: var(--accent-clay-dark); overflow-wrap: anywhere; }
+    .input { display: block; width: 100%; min-width: 0; padding: 8px 12px; background: var(--bg-input);
+      border: 1px solid var(--border-strong); font-family: var(--font-mono); font-size: 13.5px; color: var(--text-primary); }
+    .input:focus { outline: none; background: var(--bg-surface); border-color: var(--accent-clay);
+      box-shadow: 0 0 0 2px var(--accent-focus-ring); }
+    .input--icon { padding-right: 70px; }
+    .input--ro { background: var(--accent-clay-tint); color: var(--accent-clay-dark); font-weight: 600; cursor: default; }
+    .input--ro:focus { background: var(--accent-clay-tint); }
+    .input--code { padding: 12px 48px 12px 12px; line-height: 1.7; background: var(--bg-subtle); resize: vertical; }
+    .ctl { position: relative; }
+    .ctlbar { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); display: flex; gap: 4px; }
+    .ctlbar--top { top: 8px; right: 8px; transform: none; }
+    .ic { width: 14px; height: 14px; }
+    .ic--lg { width: 16px; height: 16px; }
+
+    /* ===== 按钮 ===== */
+    .btn { padding: 6px 12px; background: var(--bg-surface); border: 1px solid var(--border-strong);
+      font-family: var(--font-sans); font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; }
+    .btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .btn:focus-visible { outline: none; border-color: var(--accent-clay); box-shadow: 0 0 0 2px var(--accent-focus-ring); }
+    .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+      padding: 0; background: var(--bg-subtle); border: 1px solid var(--border-strong);
+      color: var(--text-secondary); cursor: pointer; }
+    .icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .icon-btn:focus-visible { outline: none; border-color: var(--accent-clay); box-shadow: 0 0 0 2px var(--accent-focus-ring); }
+    .icon-btn.btn-copy { background: var(--accent-clay); border-color: var(--accent-clay); color: #FFFFFF; }
+    .icon-btn.btn-copy:hover { background: var(--accent-clay-dark); border-color: var(--accent-clay-dark); }
+    .icon-btn.btn-copy--done { background: var(--success-text); border-color: var(--success-text); color: #FFFFFF; }
+
+    /* ===== 直角分段切换器 ===== */
+    .seg { display: flex; background: var(--bg-surface); border: 1px solid var(--border-strong); }
+    .seg__btn { flex: 1 1 0; min-width: 0; padding: 7px 6px; background: var(--bg-surface); border: none;
+      border-right: 1px solid var(--border-strong); font-family: var(--font-sans); font-size: 12px; font-weight: 600; line-height: 1.35;
+      color: var(--text-secondary); cursor: pointer; overflow-wrap: anywhere; }
+    .seg__btn:last-child { border-right: none; }
+    .seg__btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .seg__btn.is-active { background: var(--accent-clay); color: #FFFFFF; }
+    .seg__btn:focus-visible { outline: 2px solid var(--accent-clay); outline-offset: -2px; }
+
+    /* ===== 派生信息 chips / 只读声明行 ===== */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .chip { min-width: 0; padding: 3px 8px; background: var(--bg-surface); border: 1px solid var(--border-soft);
+      font-family: var(--font-mono); font-size: 11.5px; color: var(--text-secondary); overflow-wrap: anywhere; }
+    .chip__v { color: var(--text-primary); font-weight: 600; }
+    .chip__v--sig { color: var(--accent-clay-dark); }
+    .decl { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 4px; }
+    .decl__k { font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+    .decl__v { flex: 1 1 auto; min-width: 0; }
+
+    /* ===== 参数校验 ===== */
+    .checks { display: flex; flex-direction: column; gap: 8px; }
+    .check { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--text-secondary); }
+    .check__text { min-width: 0; overflow-wrap: anywhere; }
+    .dot { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 6px; background: var(--text-muted); }
+    .dot--pass { background: var(--success-text); }
+    .dot--warn { background: var(--warn-text); }
+    .dot--fail { background: var(--error-text); }
+    .check__tag { font-weight: 700; }
+    .check__tag--pass { color: var(--success-text); }
+    .check__tag--warn { color: var(--warn-text); }
+    .check__tag--fail { color: var(--error-text); }
+
+    /* ===== 复制数据示意图 ===== */
+    .mm-row { margin-bottom: 12px; }
+    .mm-row__head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px;
+      margin-bottom: 6px; font-size: 11.5px; color: var(--text-muted); }
+    .mm-row__title { font-weight: 600; color: var(--text-secondary); }
+    .mm-row__meta { font-family: var(--font-mono); overflow-wrap: anywhere; }
+    .mm-trunc { color: var(--error-text); font-weight: 600; }
+    .mm-empty { padding: 12px; background: var(--bg-surface); border: 1px dashed var(--border-strong);
+      font-size: 11.5px; color: var(--text-muted); text-align: center; }
+    .mm-bar { display: flex; height: 20px; background: var(--bg-input); border: 1px solid var(--border-strong); overflow: hidden; }
+    .mm-bar .cell { flex: 1 1 0; min-width: 0; border-right: 1px solid var(--border-soft); }
     .mm-bar .cell:last-child { border-right: none; }
-    .mm-bar .cell.hit { background: rgba(56, 189, 248, .45); }
-    .mm-bar .cell.ovf { background: repeating-linear-gradient(45deg, rgba(220, 38, 38, .5) 0 4px, rgba(220, 38, 38, .15) 4px 8px); }
+    .mm-bar .cell.hit { background: rgba(217, 119, 87, 0.45); }
+    .mm-bar .cell.ovf { background: repeating-linear-gradient(45deg, rgba(184, 53, 37, 0.5) 0 4px, rgba(184, 53, 37, 0.15) 4px 8px); }
     .mm-bar.seg-mode .cell { border-right: none; }
+    .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; font-size: 11.5px; color: var(--text-muted); }
+    .legend__item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend__sw { flex: 0 0 auto; width: 10px; height: 10px; border: 1px solid var(--border-soft); }
+    .legend__sw--hit { background: rgba(217, 119, 87, 0.45); }
+    .legend__sw--ovf { background: repeating-linear-gradient(45deg, rgba(184, 53, 37, 0.5) 0 4px, rgba(184, 53, 37, 0.15) 4px 8px); }
+
+    /* ===== 功能块图 ===== */
+    .fbd-wrap { overflow-x: auto; }
+    .fbd { display: flex; align-items: flex-start; width: max-content; margin: 0 auto; padding: 4px 0; }
+    .fbd__col { display: flex; flex-direction: column; padding-top: 16px; }
+    .fbd__col--l { padding-right: 18px; text-align: right; }
+    .fbd__col--r { padding-left: 18px; }
+    .fbd__spacer { font-size: 0.875rem; font-weight: 700; line-height: 1.25rem;
+      padding-bottom: 0.5rem; border-bottom: 1px solid transparent; }
+    .fbd__row { font-size: 0.68rem; line-height: 1; padding: 6px 0; white-space: nowrap; }
+    .fbd__val { font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); }
+    .fbd__val--out { color: var(--accent-clay-dark); }
+    .pin-row { display: flex; justify-content: space-between; gap: 32px; margin: 0 -12px; font-weight: 600; }
+    .pin { position: relative; }
+    .pin--in { color: var(--text-secondary); }
+    .pin--out { color: var(--accent-clay-dark); }
+    .pin--in::before { content: ""; position: absolute; left: -18px; top: 50%; width: 14px; height: 2px; background: var(--text-secondary); }
+    .pin--out::after { content: ""; position: absolute; right: -18px; top: 50%; width: 14px; height: 2px; background: var(--accent-clay); }
+    .plc-block { position: relative; min-width: 192px; padding: 16px; background: var(--bg-surface); border: 1px solid var(--text-primary); }
+    .plc-block__title { padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-strong); font-family: var(--font-mono);
+      font-size: 0.875rem; font-weight: 700; line-height: 1.25rem; text-align: center; }
+
+    /* ===== 表格（容器内横向滚动，不撑破页面） ===== */
+    .tbl-wrap { overflow-x: auto; background: var(--bg-surface); border: 1px solid var(--border-strong); }
+    .tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: left; color: var(--text-secondary); }
+    .tbl th { padding: 13px 24px; background: var(--bg-subtle); border-bottom: 1px solid var(--border-soft);
+      font-family: var(--font-sans); font-size: 11px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+    .tbl td { padding: 13px 24px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+    .tbl tr:last-child td { border-bottom: none; }
+    .tbl tbody tr:hover { background: var(--bg-hover); }
+    .td-name { font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+    .td-dir { color: var(--text-secondary); white-space: nowrap; }
+    .td-type { font-family: var(--font-mono); color: var(--text-secondary); white-space: nowrap; }
+    .td-type--accent { color: var(--accent-clay-dark); }
+    .td-val { font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+    .td-val--out { color: var(--accent-clay-dark); }
+    .td-desc { min-width: 180px; color: var(--text-secondary); }
+    .td-empty { padding: 12px; color: var(--text-muted); text-align: center; }
+    .code-ok { font-family: var(--font-mono); font-weight: 700; color: var(--success-text); }
+    .code-bad { font-family: var(--font-mono); font-weight: 700; color: var(--error-text); }
+    .code-warn { font-family: var(--font-mono); font-weight: 700; color: var(--warn-text); }
+
+    /* ===== 参考与页脚 ===== */
+    .rules { margin-top: 8px; font-size: 11.5px; line-height: 1.9; color: var(--text-secondary); }
+    .rules__hl { padding: 1px 4px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text); }
+    .reflist { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; list-style: none;
+      font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); }
+    .reflist li { position: relative; padding-left: 14px; }
+    .reflist li::before { content: ""; position: absolute; left: 0; top: 0.6em; width: 4px; height: 4px; background: var(--accent-clay); }
+    .em { color: var(--accent-clay-dark); font-weight: 600; }
+    .em--bad { color: var(--error-text); font-weight: 600; }
+    .note { margin-top: 12px; font-size: 11.5px; line-height: 1.6; color: var(--text-muted); }
+    .footer { padding-bottom: 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.7;
+      color: var(--text-muted); text-align: center; }
+
+    /* ===== 移动端（≤820px）收敛留白 ===== */
+    @media (max-width: 820px) {
+      body { padding: 24px 16px; }
+      .page-head { gap: 10px 16px; padding-bottom: 16px; margin-bottom: 20px; }
+      .page-title { font-size: 19px; }
+      .card { margin-bottom: 18px; }
+      .card__head { padding: 14px 16px; }
+      .card__body { padding: 16px; }
+      .panel { padding: 12px; }
+      .sep { padding: 7px 10px; }
+      .block { margin-bottom: 18px; }
+      .tbl { font-size: 12px; }
+      .tbl th, .tbl td { padding: 9px 10px; }
+      .td-desc { min-width: 160px; }
+    }
   </style>
 </head>
-<body class="bg-stone-100 text-stone-800 font-sans min-h-screen py-8 px-4 sm:px-6">
+<body>
 
-  <div class="max-w-5xl mx-auto">
+  <div class="wrap">
     <!-- 页头 -->
-    <header class="mb-8 text-center sm:text-left border-b border-stone-200 pb-5">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <span class="text-xs font-semibold px-2.5 py-1 bg-sky-100 text-sky-700 rounded-full inline-block mb-2">EcoStruxure Control Expert</span>
-          <h1 class="text-2xl sm:text-3xl font-bold text-stone-900 tracking-tight">EXTRACT 指令生成工具</h1>
-          <p class="text-sm text-stone-500 mt-2">依据标准功能块库文档（33003679）第 44 章：将变量的一个部分复制到另一个变量</p>
-        </div>
-        <span id="liveBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 self-start sm:self-center">参数有效 · 就绪</span>
+    <header class="page-head">
+      <div class="page-head__left">
+        <span class="tag"><b>&gt;_</b> EcoStruxure Control Expert</span>
+        <h1 class="page-title">EXTRACT 指令生成工具</h1>
+        <p class="page-sub">依据标准功能块库文档（33003679）第 44 章：将变量的一个部分复制到另一个变量</p>
       </div>
+      <span id="liveBadge" class="status status--pass">参数有效 · 就绪</span>
     </header>
 
     <!-- ==================== 参数配置 ==================== -->
-    <section class="bg-white rounded-2xl shadow-sm border border-stone-200 p-4 sm:p-6 mb-6">
-      <div class="flex items-center justify-between pb-4 mb-5 border-b border-stone-100">
-        <h2 class="text-lg font-semibold text-stone-900">参数配置</h2>
-        <button onclick="resetAll()" class="text-xs px-3 py-1.5 rounded-lg border border-stone-300 text-stone-600 bg-white hover:bg-stone-50 transition">重置为示例</button>
+    <section class="card">
+      <div class="card__head">
+        <h2 class="card__title">参数配置</h2>
+        <button onclick="resetAll()" class="btn">重置为示例</button>
       </div>
+      <div class="card__body">
 
       <!-- ① 源变量 -->
-      <h3 class="text-sm font-semibold text-stone-700 mb-2">① 源变量（SRC · ANY）</h3>
-      <div class="bg-stone-50 rounded-xl p-4 border border-stone-200 mb-6">
-        <div class="flex flex-wrap gap-x-5 gap-y-4">
-          <div class="flex-1 min-w-[12rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">变量名 / 地址</label>
-            <p class="text-xs leading-4 text-stone-400 mb-1">源变量，从中复制已定义数量的元素</p>
-            <div class="relative">
-              <input type="text" id="srcName" value="SrcArray" spellcheck="false" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 pr-16 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
-              <div class="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
-                <button onclick="clearField('srcName')" title="清空" class="p-1.5 bg-stone-200 hover:bg-stone-300 text-stone-500 rounded-md transition flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
-                <button onclick="copyField('srcName', this)" title="复制" class="p-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-md transition shadow-sm flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+      <div class="block">
+      <h3 class="sep">① 源变量（SRC · ANY）</h3>
+      <div class="panel">
+        <div class="cfg">
+          <div class="field">
+            <label class="label" for="srcName">变量名 / 地址</label>
+            <p class="hint">源变量，从中复制已定义数量的元素</p>
+            <div class="ctl">
+              <input type="text" id="srcName" value="SrcArray" spellcheck="false" oninput="render()" class="input input--icon">
+              <div class="ctlbar">
+                <button onclick="clearField('srcName')" title="清空" aria-label="清空源变量名" class="icon-btn"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                <button onclick="copyField('srcName', this)" title="复制" aria-label="复制源变量名" class="icon-btn btn-copy"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
               </div>
             </div>
           </div>
-          <div class="flex-1 min-w-[16rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">变量形式</label>
-            <p class="text-xs leading-4 text-stone-400 mb-1">数组 / 基本类型 / 字符串 / DDT</p>
-            <div class="flex p-1 bg-stone-200 rounded-xl" id="srcKindSeg">
-              <button data-k="array" onclick="setSeg('srcKind','array',this)" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-sky-500 text-white shadow-sm transition-all">数组</button>
-              <button data-k="elem" onclick="setSeg('srcKind','elem',this)" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-stone-600 hover:text-stone-900 transition-all">基本类型</button>
-              <button data-k="string" onclick="setSeg('srcKind','string',this)" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-stone-600 hover:text-stone-900 transition-all">STRING</button>
-              <button data-k="custom" onclick="setSeg('srcKind','custom',this)" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-stone-600 hover:text-stone-900 transition-all">DDT/自定义</button>
+          <div class="field field--seg">
+            <label class="label">变量形式</label>
+            <p class="hint">数组 / 基本类型 / 字符串 / DDT</p>
+            <div class="seg" id="srcKindSeg" role="group" aria-label="源变量形式">
+              <button data-k="array" aria-pressed="true" onclick="setSeg('srcKind','array',this)" class="seg__btn is-active">数组</button>
+              <button data-k="elem" aria-pressed="false" onclick="setSeg('srcKind','elem',this)" class="seg__btn">基本类型</button>
+              <button data-k="string" aria-pressed="false" onclick="setSeg('srcKind','string',this)" class="seg__btn">STRING</button>
+              <button data-k="custom" aria-pressed="false" onclick="setSeg('srcKind','custom',this)" class="seg__btn">DDT/自定义</button>
             </div>
           </div>
         </div>
-        <div id="srcArrayCfg" class="flex flex-wrap gap-x-5 gap-y-4 mt-4">
-          <div class="w-28">
-            <label class="block text-sm font-medium text-stone-700 mb-1">下界</label>
-            <input type="number" id="srcLo" value="0" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+        <div id="srcArrayCfg" class="cfg mt hidden flex">
+          <div class="field field--num">
+            <label class="label" for="srcLo">下界</label>
+            <input type="number" id="srcLo" value="0" oninput="render()" class="input">
           </div>
-          <div class="w-28">
-            <label class="block text-sm font-medium text-stone-700 mb-1">上界</label>
-            <input type="number" id="srcHi" value="9" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+          <div class="field field--num">
+            <label class="label" for="srcHi">上界</label>
+            <input type="number" id="srcHi" value="9" oninput="render()" class="input">
           </div>
-          <div class="flex-1 min-w-[10rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">元素类型</label>
-            <select id="srcElemType" onchange="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white"></select>
-          </div>
-        </div>
-        <div id="srcElemCfg" class="hidden flex flex-wrap gap-x-5 gap-y-4 mt-4">
-          <div class="flex-1 min-w-[10rem] max-w-xs">
-            <label class="block text-sm font-medium text-stone-700 mb-1">数据类型</label>
-            <select id="srcElemSingle" onchange="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white"></select>
+          <div class="field">
+            <label class="label" for="srcElemType">元素类型</label>
+            <select id="srcElemType" onchange="render()" class="input"></select>
           </div>
         </div>
-        <div id="srcStrCfg" class="hidden flex flex-wrap gap-x-5 gap-y-4 mt-4">
-          <div class="w-40">
-            <label class="block text-sm font-medium text-stone-700 mb-1">字符串长度 n</label>
-            <input type="number" id="srcStrLen" value="16" min="1" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+        <div id="srcElemCfg" class="cfg mt hidden flex">
+          <div class="field field--single">
+            <label class="label" for="srcElemSingle">数据类型</label>
+            <select id="srcElemSingle" onchange="render()" class="input"></select>
           </div>
         </div>
-        <div id="srcCustomCfg" class="hidden flex flex-wrap gap-x-5 gap-y-4 mt-4">
-          <div class="flex-1 min-w-[10rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">类型名 (DDT)</label>
-            <input type="text" id="srcCustomType" value="MyDDT" spellcheck="false" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
-          </div>
-          <div class="w-40">
-            <label class="block text-sm font-medium text-stone-700 mb-1">存储器大小 (字节)</label>
-            <input type="number" id="srcCustomBytes" value="20" min="1" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+        <div id="srcStrCfg" class="cfg mt hidden flex">
+          <div class="field field--narrow">
+            <label class="label" for="srcStrLen">字符串长度 n</label>
+            <input type="number" id="srcStrLen" value="16" min="1" oninput="render()" class="input">
           </div>
         </div>
-        <div id="srcDerived" class="flex flex-wrap gap-2 mt-3"></div>
+        <div id="srcCustomCfg" class="cfg mt hidden flex">
+          <div class="field">
+            <label class="label" for="srcCustomType">类型名 (DDT)</label>
+            <input type="text" id="srcCustomType" value="MyDDT" spellcheck="false" oninput="render()" class="input">
+          </div>
+          <div class="field field--narrow">
+            <label class="label" for="srcCustomBytes">存储器大小 (字节)</label>
+            <input type="number" id="srcCustomBytes" value="20" min="1" oninput="render()" class="input">
+          </div>
+        </div>
+        <div id="srcDerived" class="chips"></div>
+      </div>
       </div>
 
       <!-- ② 元素定义 -->
-      <h3 class="text-sm font-semibold text-stone-700 mb-2">② 元素定义（SRC_NELEM · UDINT）</h3>
-      <div class="bg-stone-50 rounded-xl p-4 border border-stone-200 mb-6">
+      <div class="block">
+      <h3 class="sep">② 元素定义（SRC_NELEM · UDINT）</h3>
+      <div class="panel">
         <div>
-          <label class="block text-sm font-medium text-stone-700 mb-1">元素划分方式</label>
-          <p class="text-xs leading-4 text-stone-400 mb-1">元素大小 = 存储器大小 ÷ SRC_NELEM（必须整除）</p>
-          <div class="flex p-1 bg-stone-200 rounded-xl" id="nelemSeg">
-            <button data-k="auto" onclick="setSeg('nelem','auto',this)" class="flex-1 py-1.5 px-1 text-xs font-semibold rounded-lg bg-sky-500 text-white shadow-sm transition-all">与源变量类型相同</button>
-            <button data-k="sizeof" onclick="setSeg('nelem','sizeof',this)" class="flex-1 py-1.5 px-1 text-xs font-semibold rounded-lg bg-transparent text-stone-600 hover:text-stone-900 transition-all">字节数（使用 SIZEOF() 函数）</button>
-            <button data-k="custom" onclick="setSeg('nelem','custom',this)" class="flex-1 py-1.5 px-1 text-xs font-semibold rounded-lg bg-transparent text-stone-600 hover:text-stone-900 transition-all">自定义</button>
+          <label class="label">元素划分方式</label>
+          <p class="hint">元素大小 = 存储器大小 ÷ SRC_NELEM（必须整除）</p>
+          <div class="seg" id="nelemSeg" role="group" aria-label="元素划分方式">
+            <button data-k="auto" aria-pressed="true" onclick="setSeg('nelem','auto',this)" class="seg__btn is-active">与源变量类型相同</button>
+            <button data-k="sizeof" aria-pressed="false" onclick="setSeg('nelem','sizeof',this)" class="seg__btn">字节数（使用 SIZEOF() 函数）</button>
+            <button data-k="custom" aria-pressed="false" onclick="setSeg('nelem','custom',this)" class="seg__btn">自定义</button>
           </div>
-          <div class="mt-2 text-xs leading-6 text-stone-600">
-            <div><span class="bg-yellow-200/80 rounded px-1 box-decoration-clone">1. EXTRACT 指令复制数量 = 元素数量</span></div>
-            <div><span class="bg-yellow-200/80 rounded px-1 box-decoration-clone">2. 起始位置、目标起始位置 = 对应变量根据元素定义计算出的位置</span></div>
+          <div class="rules">
+            <div><span class="rules__hl">1. EXTRACT 指令复制数量 = 元素数量</span></div>
+            <div><span class="rules__hl">2. 起始位置、目标起始位置 = 对应变量根据元素定义计算出的位置</span></div>
           </div>
         </div>
-        <div class="w-48 mt-4 hidden" id="nelemCustomField">
-          <label class="block text-sm font-medium text-stone-700 mb-1">SRC_NELEM 值</label>
-          <p class="text-xs leading-4 text-stone-400 mb-1">须整除存储器大小</p>
-          <input type="number" id="nelemCustom" value="10" min="1" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+        <div class="field--tight mt hidden" id="nelemCustomField">
+          <label class="label" for="nelemCustom">SRC_NELEM 值</label>
+          <p class="hint">须整除存储器大小</p>
+          <input type="number" id="nelemCustom" value="10" min="1" oninput="render()" class="input">
         </div>
-        <div id="nelemDerived" class="flex flex-wrap gap-2 mt-3"></div>
+        <div id="nelemDerived" class="chips"></div>
+      </div>
       </div>
 
       <!-- ③ 复制参数 -->
-      <h3 class="text-sm font-semibold text-stone-700 mb-2">③ 复制参数</h3>
-      <div class="bg-stone-50 rounded-xl p-4 border border-stone-200 mb-6">
-        <div class="flex flex-wrap gap-x-5 gap-y-4">
-          <div class="flex-1 min-w-[8rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">SRC_POS</label>
-            <p class="text-xs leading-4 text-stone-400 mb-1">源起始位置（0~n，可填变量）</p>
-            <input type="text" id="srcPos" value="2" spellcheck="false" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
-            <p id="srcPosHint" class="text-xs text-sky-600 mono mt-1 min-h-[1rem]"></p>
+      <div class="block">
+      <h3 class="sep">③ 复制参数</h3>
+      <div class="panel">
+        <div class="cfg">
+          <div class="field">
+            <label class="label" for="srcPos">SRC_POS</label>
+            <p class="hint">源起始位置（0~n，可填变量）</p>
+            <input type="text" id="srcPos" value="2" spellcheck="false" oninput="render()" class="input">
+            <p id="srcPosHint" class="hint--mono"></p>
           </div>
-          <div class="flex-1 min-w-[8rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">DST_POS</label>
-            <p class="text-xs leading-4 text-stone-400 mb-1">目标起始位置（0~n，可填变量）</p>
-            <input type="text" id="dstPos" value="5" spellcheck="false" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
-            <p id="dstPosHint" class="text-xs text-sky-600 mono mt-1 min-h-[1rem]"></p>
+          <div class="field">
+            <label class="label" for="dstPos">DST_POS</label>
+            <p class="hint">目标起始位置（0~n，可填变量）</p>
+            <input type="text" id="dstPos" value="5" spellcheck="false" oninput="render()" class="input">
+            <p id="dstPosHint" class="hint--mono"></p>
           </div>
-          <div class="flex-1 min-w-[8rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">CPY_NELEM</label>
-            <p class="text-xs leading-4 text-stone-400 mb-1">要复制的元素数量</p>
-            <input type="text" id="cpyNelem" value="3" spellcheck="false" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+          <div class="field">
+            <label class="label" for="cpyNelem">CPY_NELEM</label>
+            <p class="hint">要复制的元素数量</p>
+            <input type="text" id="cpyNelem" value="3" spellcheck="false" oninput="render()" class="input">
           </div>
         </div>
+      </div>
       </div>
 
       <!-- ④ 目标变量 -->
-      <h3 class="text-sm font-semibold text-stone-700 mb-2">④ 目标变量（DST · ANY）</h3>
-      <div class="bg-stone-50 rounded-xl p-4 border border-stone-200 mb-6">
-        <div class="flex flex-wrap gap-x-5 gap-y-4">
-          <div class="flex-1 min-w-[12rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">变量名 / 地址</label>
-            <p class="text-xs leading-4 text-stone-400 mb-1">目标变量，接收复制的元素</p>
-            <div class="relative">
-              <input type="text" id="dstName" value="DstArray" spellcheck="false" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 pr-16 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
-              <div class="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
-                <button onclick="clearField('dstName')" title="清空" class="p-1.5 bg-stone-200 hover:bg-stone-300 text-stone-500 rounded-md transition flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
-                <button onclick="copyField('dstName', this)" title="复制" class="p-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-md transition shadow-sm flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+      <div class="block">
+      <h3 class="sep">④ 目标变量（DST · ANY）</h3>
+      <div class="panel">
+        <div class="cfg">
+          <div class="field">
+            <label class="label" for="dstName">变量名 / 地址</label>
+            <p class="hint">目标变量，接收复制的元素</p>
+            <div class="ctl">
+              <input type="text" id="dstName" value="DstArray" spellcheck="false" oninput="render()" class="input input--icon">
+              <div class="ctlbar">
+                <button onclick="clearField('dstName')" title="清空" aria-label="清空目标变量名" class="icon-btn"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                <button onclick="copyField('dstName', this)" title="复制" aria-label="复制目标变量名" class="icon-btn btn-copy"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
               </div>
             </div>
           </div>
-          <div class="flex-1 min-w-[16rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">变量形式</label>
-            <p class="text-xs leading-4 text-stone-400 mb-1">数据类型可与源变量不同</p>
-            <div class="flex p-1 bg-stone-200 rounded-xl" id="dstKindSeg">
-              <button data-k="array" onclick="setSeg('dstKind','array',this)" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-sky-500 text-white shadow-sm transition-all">数组</button>
-              <button data-k="elem" onclick="setSeg('dstKind','elem',this)" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-stone-600 hover:text-stone-900 transition-all">基本类型</button>
-              <button data-k="string" onclick="setSeg('dstKind','string',this)" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-stone-600 hover:text-stone-900 transition-all">STRING</button>
-              <button data-k="custom" onclick="setSeg('dstKind','custom',this)" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-stone-600 hover:text-stone-900 transition-all">DDT/自定义</button>
+          <div class="field field--seg">
+            <label class="label">变量形式</label>
+            <p class="hint">数据类型可与源变量不同</p>
+            <div class="seg" id="dstKindSeg" role="group" aria-label="目标变量形式">
+              <button data-k="array" aria-pressed="true" onclick="setSeg('dstKind','array',this)" class="seg__btn is-active">数组</button>
+              <button data-k="elem" aria-pressed="false" onclick="setSeg('dstKind','elem',this)" class="seg__btn">基本类型</button>
+              <button data-k="string" aria-pressed="false" onclick="setSeg('dstKind','string',this)" class="seg__btn">STRING</button>
+              <button data-k="custom" aria-pressed="false" onclick="setSeg('dstKind','custom',this)" class="seg__btn">DDT/自定义</button>
             </div>
           </div>
         </div>
-        <div id="dstArrayCfg" class="flex flex-wrap gap-x-5 gap-y-4 mt-4">
-          <div class="w-28">
-            <label class="block text-sm font-medium text-stone-700 mb-1">下界</label>
-            <input type="number" id="dstLo" value="0" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+        <div id="dstArrayCfg" class="cfg mt hidden flex">
+          <div class="field field--num">
+            <label class="label" for="dstLo">下界</label>
+            <input type="number" id="dstLo" value="0" oninput="render()" class="input">
           </div>
-          <div class="w-28">
-            <label class="block text-sm font-medium text-stone-700 mb-1">上界</label>
-            <input type="number" id="dstHi" value="19" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+          <div class="field field--num">
+            <label class="label" for="dstHi">上界</label>
+            <input type="number" id="dstHi" value="19" oninput="render()" class="input">
           </div>
-          <div class="flex-1 min-w-[10rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">元素类型</label>
-            <select id="dstElemType" onchange="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white"></select>
-          </div>
-        </div>
-        <div id="dstElemCfg" class="hidden flex flex-wrap gap-x-5 gap-y-4 mt-4">
-          <div class="flex-1 min-w-[10rem] max-w-xs">
-            <label class="block text-sm font-medium text-stone-700 mb-1">数据类型</label>
-            <select id="dstElemSingle" onchange="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white"></select>
+          <div class="field">
+            <label class="label" for="dstElemType">元素类型</label>
+            <select id="dstElemType" onchange="render()" class="input"></select>
           </div>
         </div>
-        <div id="dstStrCfg" class="hidden flex flex-wrap gap-x-5 gap-y-4 mt-4">
-          <div class="w-40">
-            <label class="block text-sm font-medium text-stone-700 mb-1">字符串长度 n</label>
-            <input type="number" id="dstStrLen" value="32" min="1" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+        <div id="dstElemCfg" class="cfg mt hidden flex">
+          <div class="field field--single">
+            <label class="label" for="dstElemSingle">数据类型</label>
+            <select id="dstElemSingle" onchange="render()" class="input"></select>
           </div>
         </div>
-        <div id="dstCustomCfg" class="hidden flex flex-wrap gap-x-5 gap-y-4 mt-4">
-          <div class="flex-1 min-w-[10rem]">
-            <label class="block text-sm font-medium text-stone-700 mb-1">类型名 (DDT)</label>
-            <input type="text" id="dstCustomType" value="MyDDT" spellcheck="false" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
-          </div>
-          <div class="w-40">
-            <label class="block text-sm font-medium text-stone-700 mb-1">存储器大小 (字节)</label>
-            <input type="number" id="dstCustomBytes" value="40" min="1" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
+        <div id="dstStrCfg" class="cfg mt hidden flex">
+          <div class="field field--narrow">
+            <label class="label" for="dstStrLen">字符串长度 n</label>
+            <input type="number" id="dstStrLen" value="32" min="1" oninput="render()" class="input">
           </div>
         </div>
-        <div id="dstDerived" class="flex flex-wrap gap-2 mt-3"></div>
+        <div id="dstCustomCfg" class="cfg mt hidden flex">
+          <div class="field">
+            <label class="label" for="dstCustomType">类型名 (DDT)</label>
+            <input type="text" id="dstCustomType" value="MyDDT" spellcheck="false" oninput="render()" class="input">
+          </div>
+          <div class="field field--narrow">
+            <label class="label" for="dstCustomBytes">存储器大小 (字节)</label>
+            <input type="number" id="dstCustomBytes" value="40" min="1" oninput="render()" class="input">
+          </div>
+        </div>
+        <div id="dstDerived" class="chips"></div>
+      </div>
       </div>
 
       <!-- ⑤ 其他配置 -->
-      <h3 class="text-sm font-semibold text-stone-700 mb-2">⑤ 其他配置</h3>
-      <div class="bg-stone-50 rounded-xl p-4 border border-stone-200 mb-6">
-        <div class="max-w-md">
-          <label class="block text-sm font-medium text-stone-700 mb-1">ERR 输出变量</label>
-          <p class="text-xs leading-4 text-stone-400 mb-1">INT · 运行时错误代码</p>
-          <div class="relative">
-            <input type="text" id="errName" value="Copy_Status" spellcheck="false" oninput="render()" class="w-full text-sm rounded-lg border border-stone-300 p-2 pr-16 mono focus:ring-2 focus:ring-sky-400 focus:outline-none bg-white">
-            <div class="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
-              <button onclick="clearField('errName')" title="清空" class="p-1.5 bg-stone-200 hover:bg-stone-300 text-stone-500 rounded-md transition flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
-              <button onclick="copyField('errName', this)" title="复制" class="p-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-md transition shadow-sm flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+      <div class="block">
+      <h3 class="sep">⑤ 其他配置</h3>
+      <div class="panel">
+        <div class="field field--err">
+          <label class="label" for="errName">ERR 输出变量</label>
+          <p class="hint">INT · 运行时错误代码</p>
+          <div class="ctl">
+            <input type="text" id="errName" value="Copy_Status" spellcheck="false" oninput="render()" class="input input--icon">
+            <div class="ctlbar">
+              <button onclick="clearField('errName')" title="清空" aria-label="清空 ERR 输出变量名" class="icon-btn"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+              <button onclick="copyField('errName', this)" title="复制" aria-label="复制 ERR 输出变量名" class="icon-btn btn-copy"><svg class="ic" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
             </div>
           </div>
         </div>
       </div>
+      </div>
 
       <!-- ⑥ 参数校验 + 复制数据示意图 -->
-      <h3 class="text-sm font-semibold text-stone-700 mb-2">⑥ 参数校验（对应 ERR 运行时错误预判）</h3>
-      <div class="bg-stone-50 rounded-xl p-4 border border-stone-200">
-        <div id="checks" class="flex flex-col gap-2"></div>
-        <h4 class="text-xs font-bold text-stone-700 mt-4 mb-2">复制数据示意图：</h4>
+      <div class="block">
+      <h3 class="sep">⑥ 参数校验（对应 ERR 运行时错误预判）</h3>
+      <div class="panel">
+        <div id="checks" class="checks"></div>
+        <h4 class="sub-title mt">复制数据示意图：</h4>
         <div id="memmap"></div>
+      </div>
+      </div>
+
       </div>
     </section>
 
     <!-- ==================== 功能块图与生成代码 ==================== -->
-    <section class="bg-white rounded-2xl shadow-sm border border-stone-200 p-4 sm:p-6 mb-6">
-      <div class="pb-4 mb-5 border-b border-stone-100">
-        <h2 class="text-lg font-semibold text-stone-900">功能块图与生成代码</h2>
+    <section class="card">
+      <div class="card__head">
+        <h2 class="card__title">功能块图与生成代码</h2>
       </div>
+      <div class="card__body">
 
       <!-- 功能块图 -->
-      <div class="flex justify-center overflow-x-auto">
-        <div id="fbGraphic" class="py-2"></div>
+      <div class="block">
+        <div class="fbd-wrap">
+          <div id="fbGraphic"></div>
+        </div>
       </div>
 
       <!-- 变量声明表 -->
-      <div class="mt-6">
-        <h4 class="text-xs font-bold text-stone-700 mb-2">变量声明：</h4>
-        <div class="overflow-x-auto rounded-lg border border-stone-200">
-          <table class="w-full text-xs sm:text-sm text-left">
-            <thead class="bg-stone-100 text-stone-600">
+      <div class="block">
+        <h4 class="sub-title">变量声明：</h4>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead>
               <tr>
-                <th class="border-b border-stone-200 px-2 py-1.5 whitespace-nowrap">变量名</th>
-                <th class="border-b border-stone-200 px-2 py-1.5 whitespace-nowrap">数据类型</th>
-                <th class="border-b border-stone-200 px-2 py-1.5">用途</th>
+                <th>变量名</th>
+                <th>数据类型</th>
+                <th>用途</th>
               </tr>
             </thead>
-            <tbody id="declTbody" class="divide-y divide-stone-200"></tbody>
+            <tbody id="declTbody"></tbody>
           </table>
         </div>
       </div>
 
       <!-- ST 程序段 -->
-      <div class="mt-6">
-        <label class="block text-sm font-medium text-stone-700 mb-1">程序段（ST 语法）</label>
-        <div class="relative">
-          <textarea id="stCodeOut" readonly rows="10" class="w-full bg-stone-50 border border-stone-300 rounded-lg p-3 pr-12 text-xs sm:text-sm text-stone-800 mono focus:outline-none leading-6"></textarea>
-          <button onclick="copyCode(this)" title="复制" class="absolute right-2 top-2 p-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-md transition shadow-sm flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+      <div class="block">
+        <label class="label" for="stCodeOut">程序段（ST 语法）</label>
+        <div class="ctl">
+          <textarea id="stCodeOut" readonly rows="10" class="input input--code"></textarea>
+          <div class="ctlbar ctlbar--top">
+            <button onclick="copyCode(this)" title="复制" aria-label="复制程序段" class="icon-btn btn-copy"><svg class="ic ic--lg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+          </div>
         </div>
       </div>
 
       <!-- 引脚说明表 -->
-      <div class="mt-6">
-        <h4 class="text-xs font-bold text-stone-700 mb-2">功能块引脚说明表：</h4>
-        <div class="overflow-x-auto rounded-lg border border-stone-200">
-          <table class="w-full text-xs sm:text-sm text-left">
-            <thead class="bg-stone-100 text-stone-600">
+      <div class="block">
+        <h4 class="sub-title">功能块引脚说明表：</h4>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead>
               <tr>
-                <th class="border-b border-stone-200 px-2 py-1.5 whitespace-nowrap">引脚</th>
-                <th class="border-b border-stone-200 px-2 py-1.5 whitespace-nowrap">方向</th>
-                <th class="border-b border-stone-200 px-2 py-1.5 whitespace-nowrap">类型</th>
-                <th class="border-b border-stone-200 px-2 py-1.5 whitespace-nowrap">实际参数</th>
-                <th class="border-b border-stone-200 px-2 py-1.5">含义</th>
+                <th>引脚</th>
+                <th>方向</th>
+                <th>类型</th>
+                <th>实际参数</th>
+                <th>含义</th>
               </tr>
             </thead>
-            <tbody id="pinTbody" class="divide-y divide-stone-200"></tbody>
+            <tbody id="pinTbody"></tbody>
           </table>
         </div>
+      </div>
+
       </div>
     </section>
 
     <!-- ==================== 参考 ==================== -->
-    <section class="bg-white rounded-2xl shadow-sm border border-stone-200 p-4 sm:p-6 mb-6">
-      <div class="pb-4 mb-5 border-b border-stone-100">
-        <h2 class="text-lg font-semibold text-stone-900">参考</h2>
+    <section class="card">
+      <div class="card__head">
+        <h2 class="card__title">参考</h2>
       </div>
-      <h4 class="text-xs font-bold text-stone-700 mb-2">ERR 运行时错误代码：</h4>
-      <div class="overflow-x-auto rounded-lg border border-stone-200 mb-6">
-        <table class="w-full text-xs sm:text-sm text-left">
-          <thead class="bg-stone-100 text-stone-600">
-            <tr>
-              <th class="border-b border-stone-200 px-2 py-1.5 whitespace-nowrap">ERR 的值</th>
-              <th class="border-b border-stone-200 px-2 py-1.5">描述</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-stone-200 odd:bg-white even:bg-stone-50">
-            <tr><td class="px-2 py-1.5 font-bold text-emerald-600 mono">0</td><td class="px-2 py-1.5 text-stone-600">复制操作成功。</td></tr>
-            <tr><td class="px-2 py-1.5 font-bold text-red-500 mono">-1</td><td class="px-2 py-1.5 text-stone-600">源变量的元素数量（SRC_NELEM）未定义。</td></tr>
-            <tr><td class="px-2 py-1.5 font-bold text-red-500 mono">-2</td><td class="px-2 py-1.5 text-stone-600">元素数量与源变量的大小不匹配 —— 源变量的存储器大小被除后有余数。</td></tr>
-            <tr><td class="px-2 py-1.5 font-bold text-red-500 mono">-3</td><td class="px-2 py-1.5 text-stone-600">SRC_POS 超出源变量范围。</td></tr>
-            <tr><td class="px-2 py-1.5 font-bold text-red-500 mono">-4</td><td class="px-2 py-1.5 text-stone-600">DST_POS 超出目标变量范围。</td></tr>
-            <tr><td class="px-2 py-1.5 font-bold text-amber-600 mono">1</td><td class="px-2 py-1.5 text-stone-600">CPY_NELEM = 0，不存在要复制的元素（参数可疑，但为有效参数）。</td></tr>
-            <tr><td class="px-2 py-1.5 font-bold text-amber-600 mono">2</td><td class="px-2 py-1.5 text-stone-600">由于空间不足，并非所有元素都可复制到目标变量，要复制的元素已缩短。</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="text-xs text-stone-500 mb-6">ERR &lt; 0：参数无效，复制操作尚未执行；ERR &gt; 0：参数可疑但有效，复制操作已执行。</p>
+      <div class="card__body">
 
-      <h4 class="text-xs font-bold text-stone-700 mb-2">使用说明与注意事项：</h4>
-      <ul class="list-disc ml-5 text-xs sm:text-sm text-stone-600 space-y-1.5 leading-6">
-        <li>SRC 与 DST 的数据类型均为 <b class="text-sky-700">ANY</b>，源变量和目标变量的数据类型可以不同；复制操作<b class="text-red-500">不会进行有效性检查</b>。</li>
-        <li>源变量的存储器大小由功能块内部确定（以字节为单位），<b class="text-sky-700">不同 PLC 平台校正方式不同</b>，存储器大小可能不同；本工具按基本类型标准字节数估算。</li>
-        <li>元素大小 = 存储器大小 ÷ SRC_NELEM，SRC_NELEM 必须能整除存储器大小。可使用 <b class="text-sky-700">SIZEOF</b> 功能将 SRC_NELEM 设置为源变量的字节数（此时 1 元素 = 1 字节，位置即字节偏移）。</li>
-        <li>SRC_POS 与 DST_POS 均以 <b class="text-sky-700">0 到 n</b> 表示：如 ARRAY[5..14] 中 SRC_POS = 2 对应数组下标 7。</li>
-        <li>无法复制 <b class="text-red-500">EBOOL 和 IODDT</b> 中的部分内容。</li>
-        <li>EXTRACT 为「过程」类型功能块：在 M340 / M580 / Quantum / Momentum / Premium 平台可用，未在 IEC 61131-3 中定义，使用前需在 Control Expert 中启用扩展。</li>
-      </ul>
+      <div class="block">
+        <h4 class="sub-title">ERR 运行时错误代码：</h4>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>ERR 的值</th>
+                <th>描述</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="code-ok">0</td><td>复制操作成功。</td></tr>
+              <tr><td class="code-bad">-1</td><td>源变量的元素数量（SRC_NELEM）未定义。</td></tr>
+              <tr><td class="code-bad">-2</td><td>元素数量与源变量的大小不匹配 —— 源变量的存储器大小被除后有余数。</td></tr>
+              <tr><td class="code-bad">-3</td><td>SRC_POS 超出源变量范围。</td></tr>
+              <tr><td class="code-bad">-4</td><td>DST_POS 超出目标变量范围。</td></tr>
+              <tr><td class="code-warn">1</td><td>CPY_NELEM = 0，不存在要复制的元素（参数可疑，但为有效参数）。</td></tr>
+              <tr><td class="code-warn">2</td><td>由于空间不足，并非所有元素都可复制到目标变量，要复制的元素已缩短。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">ERR &lt; 0：参数无效，复制操作尚未执行；ERR &gt; 0：参数可疑但有效，复制操作已执行。</p>
+      </div>
+
+      <div class="block">
+        <h4 class="sub-title">使用说明与注意事项：</h4>
+        <ul class="reflist">
+          <li>SRC 与 DST 的数据类型均为 <b class="em">ANY</b>，源变量和目标变量的数据类型可以不同；复制操作<b class="em--bad">不会进行有效性检查</b>。</li>
+          <li>源变量的存储器大小由功能块内部确定（以字节为单位），<b class="em">不同 PLC 平台校正方式不同</b>，存储器大小可能不同；本工具按基本类型标准字节数估算。</li>
+          <li>元素大小 = 存储器大小 ÷ SRC_NELEM，SRC_NELEM 必须能整除存储器大小。可使用 <b class="em">SIZEOF</b> 功能将 SRC_NELEM 设置为源变量的字节数（此时 1 元素 = 1 字节，位置即字节偏移）。</li>
+          <li>SRC_POS 与 DST_POS 均以 <b class="em">0 到 n</b> 表示：如 ARRAY[5..14] 中 SRC_POS = 2 对应数组下标 7。</li>
+          <li>无法复制 <b class="em--bad">EBOOL 和 IODDT</b> 中的部分内容。</li>
+          <li>EXTRACT 为「过程」类型功能块：在 M340 / M580 / Quantum / Momentum / Premium 平台可用，未在 IEC 61131-3 中定义，使用前需在 Control Expert 中启用扩展。</li>
+        </ul>
+      </div>
+
+      </div>
     </section>
 
-    <footer class="text-center text-xs text-stone-400 pb-4">
+    <footer class="footer">
       依据文档 33003679 09/2020 · 第 44 章 EXTRACT 生成 · SRC · SRC_NELEM · SRC_POS · DST_POS · CPY_NELEM · DST · ERR
     </footer>
   </div>
@@ -365,13 +604,14 @@ const $ = id => document.getElementById(id);
 
 /* ================= 分段选择器 ================= */
 const segVal = {srcKind:'array', dstKind:'array', nelem:'auto'};
-const TAB_ON  = 'flex-1 py-1.5 text-xs font-semibold rounded-lg bg-sky-500 text-white shadow-sm transition-all';
-const TAB_OFF = 'flex-1 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-stone-600 hover:text-stone-900 transition-all';
+const TAB_ON  = 'seg__btn is-active';
+const TAB_OFF = 'seg__btn';
 
 function setSeg(key, val, btn){
   segVal[key] = val;
-  btn.parentElement.querySelectorAll('button').forEach(b=>b.className = TAB_OFF);
+  btn.parentElement.querySelectorAll('button').forEach(b=>{ b.className = TAB_OFF; b.setAttribute('aria-pressed','false'); });
   btn.className = TAB_ON;
+  btn.setAttribute('aria-pressed','true');
   if(key==='srcKind' || key==='dstKind'){
     toggleCfgs(key==='srcKind' ? 'src' : 'dst');
   }
@@ -412,9 +652,9 @@ function clearField(id){
   $(id).focus();
 }
 function flashBtn(btn){
-  btn.classList.remove('bg-sky-500','hover:bg-sky-600');
-  btn.classList.add('bg-emerald-500');
-  setTimeout(()=>{ btn.classList.add('bg-sky-500','hover:bg-sky-600'); btn.classList.remove('bg-emerald-500'); }, 1200);
+  btn.classList.remove('btn-copy');
+  btn.classList.add('btn-copy--done');
+  setTimeout(()=>{ btn.classList.add('btn-copy'); btn.classList.remove('btn-copy--done'); }, 1200);
 }
 function copyField(id, btn){
   const text = $(id).value;
@@ -581,16 +821,16 @@ function buildModel(){
 /* ================= 渲染：派生信息 chips ================= */
 function chips(el, arr){
   el.innerHTML = arr.map(c=>
-    '<span class="text-xs mono bg-white border border-stone-200 rounded px-2 py-0.5 text-stone-600">'
-    + c.k + ' <b class="'+(c.sig?'text-sky-700':'text-stone-800')+'">'+esc(c.v)+'</b></span>'
+    '<span class="chip">'
+    + c.k + ' <b class="chip__v'+(c.sig?' chip__v--sig':'')+'">'+esc(c.v)+'</b></span>'
   ).join('');
 }
 /* 声明独占一行，以只读输入框显示（不可编辑） */
 function declRowHTML(text){
-  return '<div class="w-full flex items-center gap-2">'
-    + '<span class="text-xs font-medium text-stone-500 whitespace-nowrap">声明</span>'
+  return '<div class="decl">'
+    + '<span class="decl__k">声明</span>'
     + '<input type="text" readonly value="'+esc(text)+'" spellcheck="false" onclick="this.select()" '
-    + 'class="flex-1 min-w-0 text-xs sm:text-sm rounded-lg border border-stone-300 px-2 py-1.5 mono bg-white text-sky-700 font-bold focus:outline-none cursor-default"></div>';
+    + 'class="input input--ro decl__v mono"></div>';
 }
 function renderDerived(m){
   const s = m.src, d = m.dst;
@@ -619,23 +859,23 @@ function renderDerived(m){
 
 /* ================= 渲染：校验 ================= */
 function renderChecks(m){
-  const DOT = {pass:'bg-emerald-500', warn:'bg-amber-500', fail:'bg-red-500'};
-  const TAG = {pass:'text-emerald-600', warn:'text-amber-600', fail:'text-red-500'};
+  const DOT = {pass:'dot--pass', warn:'dot--warn', fail:'dot--fail'};
+  const TAG = {pass:'check__tag--pass', warn:'check__tag--warn', fail:'check__tag--fail'};
   $('checks').innerHTML = m.checks.map(c=>
-    '<div class="flex items-start gap-2 text-xs sm:text-sm text-stone-600">'
-    + '<span class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 '+DOT[c.lv]+'"></span>'
-    + '<span><b class="mono '+TAG[c.lv]+'">'+esc(c.tag)+'</b>　'+esc(c.text)+'</span></div>'
+    '<div class="check">'
+    + '<span class="dot '+DOT[c.lv]+'"></span>'
+    + '<span class="check__text"><b class="mono check__tag '+TAG[c.lv]+'">'+esc(c.tag)+'</b>　'+esc(c.text)+'</span></div>'
   ).join('');
   const worst = m.checks.some(c=>c.lv==='fail') ? 'fail' : (m.checks.some(c=>c.lv==='warn') ? 'warn' : 'pass');
   const badge = $('liveBadge');
   if(worst==='fail'){
-    badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-600 self-start sm:self-center';
+    badge.className = 'status status--fail';
     badge.textContent = '存在无效参数';
   }else if(worst==='warn'){
-    badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 self-start sm:self-center';
+    badge.className = 'status status--warn';
     badge.textContent = '参数可疑 · 注意';
   }else{
-    badge.className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 self-start sm:self-center';
+    badge.className = 'status status--pass';
     badge.textContent = '参数有效 · 就绪';
   }
 }
@@ -649,26 +889,25 @@ function renderFBD(m){
     {l:m.dstPosRaw, pl:'DST_POS', pr:'', r:''},
     {l:m.cpyRaw, pl:'CPY_NELEM', pr:'', r:''}
   ];
-  const rowCls = 'py-1.5 whitespace-nowrap';
-  const st0 = 'font-size:0.68rem';
-  const titleSpacer = '<div class="text-sm font-bold pb-2 border-b border-transparent" style="line-height:1.25rem">&nbsp;</div>';
+  const rowCls = 'fbd__row';
+  const titleSpacer = '<div class="fbd__spacer">&nbsp;</div>';
   let leftCol = '', pinRows = '', rightCol = '';
   rows.forEach(row=>{
-    leftCol += '<div class="'+rowCls+' mono font-bold text-stone-800 text-right" style="'+st0+'">'+esc(row.l)+'</div>';
-    pinRows += '<div class="'+rowCls+' -mx-3 font-semibold flex justify-between gap-8" style="'+st0+'">'
-      + '<span class="relative plc-pin-in text-stone-700">'+row.pl+'</span>'
-      + (row.pr ? '<span class="relative plc-pin-out text-sky-700">'+row.pr+'</span>' : '')
+    leftCol += '<div class="'+rowCls+' fbd__val">'+esc(row.l)+'</div>';
+    pinRows += '<div class="'+rowCls+' pin-row">'
+      + '<span class="pin pin--in">'+row.pl+'</span>'
+      + (row.pr ? '<span class="pin pin--out">'+row.pr+'</span>' : '')
       + '</div>';
-    rightCol += '<div class="'+rowCls+' mono font-bold text-sky-700" style="'+st0+'">'+(row.r?esc(row.r):'&nbsp;')+'</div>';
+    rightCol += '<div class="'+rowCls+' fbd__val fbd__val--out">'+(row.r?esc(row.r):'&nbsp;')+'</div>';
   });
   $('fbGraphic').innerHTML =
-    '<div class="flex items-start justify-center">'
-    + '<div class="flex flex-col pt-4 pr-3.5">'+titleSpacer+leftCol+'</div>'
-    + '<div class="plc-block rounded p-4 shadow-sm border-stone-300 min-w-[12rem]">'
-    +   '<div class="text-center font-bold text-sm text-stone-900 pb-2 border-b border-stone-300 mono">EXTRACT</div>'
+    '<div class="fbd">'
+    + '<div class="fbd__col fbd__col--l">'+titleSpacer+leftCol+'</div>'
+    + '<div class="plc-block">'
+    +   '<div class="plc-block__title">EXTRACT</div>'
     +   pinRows
     + '</div>'
-    + '<div class="flex flex-col pt-4 pl-3.5">'+titleSpacer+rightCol+'</div>'
+    + '<div class="fbd__col fbd__col--r">'+titleSpacer+rightCol+'</div>'
     + '</div>';
 }
 
@@ -705,14 +944,14 @@ function renderMemmap(m){
   const box = $('memmap');
   const numeric = m.ne.value!==null && m.srcPos!==null && m.cpy!==null && m.srcPos>=0 && m.cpy>0;
   if(!numeric || !m.elemBytes){
-    box.innerHTML = '<div class="text-xs text-stone-400 border border-dashed border-stone-300 rounded-lg p-3 text-center">位置 / 数量为变量表达式、为零或参数不完整 —— 示意图在运行时动态确定</div>';
+    box.innerHTML = '<div class="mm-empty">位置 / 数量为变量表达式、为零或参数不完整 —— 示意图在运行时动态确定</div>';
     return;
   }
   let html = '';
   /* 第一行：源变量，以源元素个数为基准，高亮读取区 */
   const readEnd = Math.min(m.srcPos + m.cpy, m.ne.value);
-  html += '<div class="mb-3">'
-    + '<div class="flex flex-wrap justify-between gap-2 text-xs text-stone-500 mb-1"><span class="font-semibold text-stone-700">SRC · '+esc(m.src.name)+'</span><span class="mono">'
+  html += '<div class="mm-row">'
+    + '<div class="mm-row__head"><span class="mm-row__title">SRC · '+esc(m.src.name)+'</span><span class="mm-row__meta">'
     + m.ne.value+' 元素 × '+m.elemBytes+' Byte（共 '+(m.src.bytes!==null?m.src.bytes:'—')+' 字节）· 读取 ['+m.srcPos+' … '+(readEnd-1)+']'
     + (m.srcPos+m.cpy>m.ne.value?' · 源侧越界':'')+'</span></div>'
     + barHTML(m.ne.value, m.srcPos, Math.min(m.cpy, Math.max(0, m.ne.value-m.srcPos)), null)
@@ -723,16 +962,16 @@ function renderMemmap(m){
     copied = Math.max(0, Math.min(m.cpy, m.capacity - m.dstPos));
     truncated = m.cpy - copied;
   }
-  html += '<div class="mb-1">'
-    + '<div class="flex flex-wrap justify-between gap-2 text-xs text-stone-500 mb-1"><span class="font-semibold text-stone-700">复制数据 · '+m.cpy+' 元素 → '+esc(m.dst.name)+'</span><span class="mono">'
+  html += '<div class="mm-row">'
+    + '<div class="mm-row__head"><span class="mm-row__title">复制数据 · '+m.cpy+' 元素 → '+esc(m.dst.name)+'</span><span class="mm-row__meta">'
     + (copied>0 ? '写入位置 ['+m.dstPos+' … '+(m.dstPos+copied-1)+']' : '无可写入元素')
-    + (truncated>0 ? ' · <span class="text-red-500 font-semibold">截断 '+truncated+' 元素</span>' : '')
+    + (truncated>0 ? ' · <span class="mm-trunc">截断 '+truncated+' 元素</span>' : '')
     + '</span></div>'
     + barHTML(m.cpy, 0, copied, truncated>0 ? copied : null)
     + '</div>';
-  html += '<div class="flex flex-wrap gap-4 text-xs text-stone-400 mt-2">'
-    + '<span><span class="inline-block w-2.5 h-2.5 rounded-sm align-[-1px] mr-1" style="background:rgba(56,189,248,.45)"></span>复制区域</span>'
-    + '<span><span class="inline-block w-2.5 h-2.5 rounded-sm align-[-1px] mr-1" style="background:repeating-linear-gradient(45deg,rgba(220,38,38,.5) 0 3px,rgba(220,38,38,.15) 3px 6px)"></span>截断（目标空间不足，ERR=2）</span>'
+  html += '<div class="legend">'
+    + '<span class="legend__item"><span class="legend__sw legend__sw--hit"></span>复制区域</span>'
+    + '<span class="legend__item"><span class="legend__sw legend__sw--ovf"></span>截断（目标空间不足，ERR=2）</span>'
     + '</div>';
   box.innerHTML = html;
 }
@@ -750,11 +989,11 @@ function renderPinTable(m){
   ];
   $('pinTbody').innerHTML = rows.map(r=>
     '<tr>'
-    + '<td class="px-2 py-1.5 font-bold text-stone-800 mono whitespace-nowrap">'+r.pin+'</td>'
-    + '<td class="px-2 py-1.5 text-stone-600 whitespace-nowrap">'+r.dir+'</td>'
-    + '<td class="px-2 py-1.5 text-stone-600 mono whitespace-nowrap">'+r.type+'</td>'
-    + '<td class="px-2 py-1.5 font-bold '+(r.dir==='输出'?'text-sky-700':'text-stone-800')+' mono whitespace-nowrap">'+esc(r.val)+'</td>'
-    + '<td class="px-2 py-1.5 text-stone-600">'+esc(r.desc)+'</td>'
+    + '<td class="td-name">'+r.pin+'</td>'
+    + '<td class="td-dir">'+r.dir+'</td>'
+    + '<td class="td-type">'+r.type+'</td>'
+    + '<td class="'+(r.dir==='输出'?'td-val td-val--out':'td-val')+'">'+esc(r.val)+'</td>'
+    + '<td class="td-desc">'+esc(r.desc)+'</td>'
     + '</tr>'
   ).join('');
 }
@@ -774,11 +1013,11 @@ function renderDeclTable(m){
   const rows = declRows(m);
   $('declTbody').innerHTML = rows.length ? rows.map(r=>
     '<tr>'
-    + '<td class="px-2 py-1.5 font-bold text-stone-800 mono whitespace-nowrap">'+esc(r.n)+'</td>'
-    + '<td class="px-2 py-1.5 text-sky-700 mono whitespace-nowrap">'+esc(r.t)+'</td>'
-    + '<td class="px-2 py-1.5 text-stone-600">'+esc(r.u)+'</td>'
+    + '<td class="td-name">'+esc(r.n)+'</td>'
+    + '<td class="td-type td-type--accent">'+esc(r.t)+'</td>'
+    + '<td class="td-desc">'+esc(r.u)+'</td>'
     + '</tr>'
-  ).join('') : '<tr><td colspan="3" class="px-2 py-2 text-stone-400 text-center">无有效变量声明（变量名为地址或无效标识符）</td></tr>';
+  ).join('') : '<tr><td colspan="3" class="td-empty">无有效变量声明（变量名为地址或无效标识符）</td></tr>';
 }
 function genST(m){
   const args = [

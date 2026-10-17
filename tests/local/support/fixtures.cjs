@@ -9,24 +9,15 @@ const isCandidateMode = process.env.LOCAL_CHECK_MODE === 'candidates';
 const safe = value => value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 150);
 const imageOptions = { fullPage: true, animations: 'disabled', caret: 'hide', scale: 'css' };
 
-function styleFixture() {
-  const dir = path.join(__dirname, 'vendor');
-  const file = path.join(dir, process.env.LOCAL_CHECK_INJECT === 'missing-style' ? 'absent.js' : 'tailwind.js');
-  if (!fs.existsSync(file)) throw new Error('ENV_BLOCKED: Tailwind fixture missing');
-  const metadata = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
-  const content = fs.readFileSync(file);
-  if (hash(content) !== metadata.sha256) throw new Error('ENV_BLOCKED: Tailwind fixture hash mismatch');
-  return content;
-}
-
 async function assertDynamicStyle(page) {
   const classes = await page.locator('#liveBadge').getAttribute('class');
-  const expected = classes.includes('bg-red-100') ? 'rgb(254, 226, 226)'
-    : classes.includes('bg-amber-100') ? 'rgb(254, 243, 199)' : 'rgb(209, 250, 229)';
+  const expected = classes.includes('status--fail') ? 'rgb(253, 236, 233)'
+    : classes.includes('status--warn') ? 'rgb(253, 242, 235)' : 'rgb(235, 245, 238)';
   try {
+    await expect(page.locator('#liveBadge')).toHaveClass(/\bstatus--(?:pass|warn|fail)\b/);
     await expect.poll(() => page.locator('#liveBadge').evaluate(el => getComputedStyle(el).backgroundColor)).toBe(expected);
   } catch (error) {
-    throw new Error(`ENV_BLOCKED: dynamic Tailwind styles unavailable\n${error.message}`);
+    throw new Error(`ENV_BLOCKED: dynamic inline styles unavailable\n${error.message}`);
   }
 }
 
@@ -97,7 +88,6 @@ const test = base.extend({
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
     try {
-      const style = styleFixture();
       const env = environment(browser.version());
       fs.mkdirSync(laneDir, { recursive: true });
       fs.writeFileSync(path.join(laneDir, `environment-${testInfo.project.name}.json`), JSON.stringify({
@@ -107,10 +97,12 @@ const test = base.extend({
       }, null, 2));
       await page.route('**/*', async route => {
         const url = new URL(route.request().url());
-        if (url.href === 'https://cdn.tailwindcss.com/') {
-          await route.fulfill({ contentType: 'application/javascript', body: style });
-        } else if (url.origin === new URL(baseURL).origin && ['/', '/index.html'].includes(url.pathname)) {
-          await route.continue();
+        if (url.origin === new URL(baseURL).origin && ['/', '/index.html'].includes(url.pathname)) {
+          if (process.env.LOCAL_CHECK_INJECT === 'missing-style') {
+            const html = fs.readFileSync(path.join(root, 'dist/index.html'), 'utf8')
+              .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '');
+            await route.fulfill({ contentType: 'text/html; charset=utf-8', body: html });
+          } else await route.continue();
         } else {
           unexpectedRequests.push(url.href);
           await route.abort('blockedbyclient');
@@ -126,11 +118,11 @@ const test = base.extend({
       });
       await page.goto('/index.html');
       try {
-        await expect.poll(() => page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(245, 245, 244)');
-        await expect.poll(() => page.locator('section').first().evaluate(el => getComputedStyle(el).borderRadius)).toBe('16px');
+        await expect.poll(() => page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(250, 249, 245)');
+        await expect.poll(() => page.locator('section').first().evaluate(el => getComputedStyle(el).borderRadius)).toBe('0px');
         await assertDynamicStyle(page);
       } catch (error) {
-        throw new Error(`ENV_BLOCKED: real Tailwind styles required\n${error.message}`);
+        throw new Error(`ENV_BLOCKED: inline CSS styles required\n${error.message}`);
       }
       await page.evaluate(() => document.fonts.ready);
       if (process.env.LOCAL_CHECK_INJECT === 'bad-st') await page.locator('#stCodeOut').evaluate(el => { el.value = 'BROKEN ST'; });

@@ -1,2 +1,0 @@
-# Keep downloaded fixture bytes identical on Windows checkouts.
-tests/local/support/vendor/* -text

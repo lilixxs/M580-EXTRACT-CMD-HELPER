@@ -29,6 +29,7 @@ const git = (...parameters) => execFileSync('git', parameters, { cwd: root, enco
 const npmCli = process.env.npm_execpath || path.join(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
 const summary = {
   runId, startedAt: new Date().toISOString(), mode: options.candidates ? 'candidates' : 'compare',
+  injectedControl: options.inject || null,
   status: 'blocked', realSystemClipboard: 'not-executed', lanes: [],
   worktreesRetained: true
 };
@@ -123,7 +124,7 @@ async function runLane(lane) {
     if (!fs.existsSync(chromium.executablePath())) throw new Error('ENV_BLOCKED: run npx playwright install chromium first');
     summary.commit = git('rev-parse', 'HEAD');
     summary.sourceSha256 = hash(fs.readFileSync(path.join(root, 'INDEX.html')));
-    summary.styleFixture = JSON.parse(fs.readFileSync(path.join(root, 'tests/local/support/vendor/manifest.json'), 'utf8'));
+    summary.inlineStyleSha256 = hash(require('../tests/local/support/environment.cjs').inlineStyles());
     if (options.inject === 'port-in-use') {
       occupied = net.createServer();
       await new Promise((resolve, reject) => { occupied.once('error', reject); occupied.listen(ports[options.lane], '127.0.0.1', resolve); });
@@ -133,6 +134,10 @@ async function runLane(lane) {
       : summary.lanes.some(lane => lane.status === 'blocked') ? 'blocked'
       : summary.lanes.some(lane => lane.status === 'baseline-pending') ? 'baseline-pending' : 'passed';
     if (summary.lanes.length !== lanes.length) summary.status = 'blocked';
+    if (options.inject && summary.status === 'passed') {
+      summary.status = 'failed';
+      summary.error = 'Negative control was not detected';
+    }
   } catch (error) {
     summary.error = error.message;
     console.error(error.message);

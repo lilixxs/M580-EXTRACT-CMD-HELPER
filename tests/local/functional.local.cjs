@@ -1,9 +1,10 @@
 /**
- * EXTRACT 指令生成工具 INDEX.html —— 本地功能 lane（Lane A，真实 Tailwind 样式）
+ * EXTRACT 指令生成工具 INDEX.html —— 本地功能 lane（Lane A，INDEX.html 内联 CSS 的真实样式）
  * 范围：STRING / DDT / SIZEOF 的元素划分派生、变量名清空、按钮复制的 API 合同与回退路径。
- * 页面加载、离线 Tailwind fixture、默认剪贴板与 execCommand mock、默认 ST 与无异常守卫、
+ * 页面加载、内联 CSS 样式守卫、默认剪贴板与 execCommand mock、默认 ST 与无异常守卫、
  * 逐例证据截图均由 ./support/fixtures.cjs 的 localGuard 自动完成；进入用例时页面已是 fresh 状态。
  * 本文件不重复 goto / route / beforeEach，不设视口，不测样式像素与布局。
+ * 复制按钮状态由 class 令牌表达：成功态加 btn-copy--done 并移除 btn-copy，1200ms 后恢复为 btn-copy。
  * 复制反馈先 install 再 pauseAt 冻结假时钟，恢复用 runFor(1201) 精确推进，不使用任意 sleep。
  */
 const { test, expect, captureEvidence } = require('./support/fixtures.cjs');
@@ -15,6 +16,12 @@ test.describe('EXTRACT 本地功能回归（STRING / DDT / SIZEOF / 清空 / 复
   const checksText = (page) => page.locator('#checks').innerText();
   const clipboardWrites = (page) => page.evaluate(() => window.__localClipboardWrites.slice());
   const execCommands = (page) => page.evaluate(() => window.__localExecCommands.slice());
+  /**
+   * 复制按钮的 class 令牌：成功态为 btn-copy--done（此时不再带 btn-copy），恢复态为 btn-copy。
+   * 恢复态必须按令牌边界匹配，否则 /btn-copy/ 会被 done 态的前缀 btn-copy--done 误判为已恢复。
+   */
+  const COPY_DONE = /btn-copy--done/;
+  const COPY_RESTED = /(^|\s)btn-copy(\s|$)/;
 
   test('元素划分 SIZEOF：SRC_NELEM 取 SIZEOF(SrcArray)、元素 1 字节、目标 40 × BYTE', async ({ page }) => {
     await page.click('#nelemSeg button[data-k="sizeof"]');
@@ -91,25 +98,25 @@ test.describe('EXTRACT 本地功能回归（STRING / DDT / SIZEOF / 清空 / 复
     const srcBox = srcName.locator('xpath=..');
 
     await srcCopy.click();
-    await expect(srcCopy).toHaveClass(/bg-emerald-500/);
+    await expect(srcCopy).toHaveClass(COPY_DONE);
     expect(await clipboardWrites(page)).toEqual(['SrcArray']);
     await captureEvidence(page, testInfo, 'copy-feedback-src-name', srcBox);
 
     await page.clock.runFor(1201);
-    await expect(srcCopy).not.toHaveClass(/bg-emerald-500/);
-    await expect(srcCopy).toHaveClass(/bg-sky-500/);
+    await expect(srcCopy).not.toHaveClass(COPY_DONE);
+    await expect(srcCopy).toHaveClass(COPY_RESTED);
     await captureEvidence(page, testInfo, 'copy-restored-src-name', srcBox);
 
     const stText = await stOut(page).inputValue();
     const codeCopy = siblingButton(page, 'stCodeOut', '复制');
     await codeCopy.click();
-    await expect(codeCopy).toHaveClass(/bg-emerald-500/);
+    await expect(codeCopy).toHaveClass(COPY_DONE);
     const writes = await clipboardWrites(page);
     expect(writes).toEqual(['SrcArray', stText]);
     expect(writes[1]).toMatch(/SRC_NELEM\s*:=\s*10,/);
 
     await page.clock.runFor(1201);
-    await expect(codeCopy).not.toHaveClass(/bg-emerald-500/);
+    await expect(codeCopy).not.toHaveClass(COPY_DONE);
   });
 
   test('复制回退：writeText 被拒绝时改用 document.execCommand("copy")', async ({ page }) => {
@@ -132,14 +139,14 @@ test.describe('EXTRACT 本地功能回归（STRING / DDT / SIZEOF / 清空 / 复
     const before = await page.evaluate(() => window.__localClipboardWrites.length);
     await srcCopy.click();
 
-    await expect(srcCopy).toHaveClass(/bg-emerald-500/);
+    await expect(srcCopy).toHaveClass(COPY_DONE);
     expect(await page.evaluate(() => window.__localWriteAttempts)).toBe(1);
     expect(await execCommands(page)).toEqual(['copy']);
     expect(await page.evaluate(() => window.__localClipboardWrites.length)).toBe(before);
     expect(await stOut(page).inputValue()).toMatch(/SRC_NELEM\s*:=\s*10,/);
 
     await page.clock.runFor(1201);
-    await expect(srcCopy).not.toHaveClass(/bg-emerald-500/);
+    await expect(srcCopy).not.toHaveClass(COPY_DONE);
   });
 
   test('复制回退：navigator.clipboard 缺失时改用 document.execCommand("copy")', async ({ page }) => {
@@ -153,12 +160,12 @@ test.describe('EXTRACT 本地功能回归（STRING / DDT / SIZEOF / 清空 / 复
     const srcCopy = siblingButton(page, 'srcName', '复制');
     await srcCopy.click();
 
-    await expect(srcCopy).toHaveClass(/bg-emerald-500/);
+    await expect(srcCopy).toHaveClass(COPY_DONE);
     expect(await execCommands(page)).toEqual(['copy']);
     expect(await clipboardWrites(page)).toEqual([]);
     expect(await stOut(page).inputValue()).toMatch(/SRC_NELEM\s*:=\s*10,/);
 
     await page.clock.runFor(1201);
-    await expect(srcCopy).not.toHaveClass(/bg-emerald-500/);
+    await expect(srcCopy).not.toHaveClass(COPY_DONE);
   });
 });

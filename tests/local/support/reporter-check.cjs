@@ -10,7 +10,7 @@ const { laneDir } = require('./paths.cjs');
 const stop = '\x1b[31mTesting stopped early after 1 maximum allowed failures.\x1b[39m';
 
 for (const [errors, expected] of [
-  [['Error: ENV_BLOCKED: Tailwind fixture missing'], 'blocked'],
+  [['Error: ENV_BLOCKED: inline CSS styles required'], 'blocked'],
   [['Error: BASELINE_PENDING: approval missing'], 'baseline-pending'],
   [['Error: BASELINE_PENDING: approval missing', 'Error: expect(value).toBe(expected)'], 'failed']
 ]) {

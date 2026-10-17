@@ -12,10 +12,10 @@
 - CPU 目标仅含 M340/M580。后续需求禁用 M580 的 CPU 串口和 CAN 口，禁用 M340 的远程 IO，并删除远程 IO 网口模块选项。
 - 处理远程串口地址时，分别检查 JS 源码转义、页面实际字符串及解析器兼容格式。DOCX 中的单、双反斜杠示例存在冲突。
 - 目标 SVG 等比铺满区块宽度，参数映射表位于图下。两行链路与机架说明位于 SVG 外。生成页与解析页须同步处理。
-- `claude_code_light_ui_style_guide.md` 描述直角、陶土橙风格，与当前 HTML 的圆角、stone/sky 风格不同。仅在任务要求应用该指南时切换样式。
+- 当前页面已采用 `claude_code_light_ui_style_guide.md` 的浅色、直角、陶土橙风格。修改界面时保持该风格，除非用户明确要求更换。
 
 ## 当前页面的修改边界
-- HTML、CSS 和原生 JS 均位于 `INDEX.html`。页面从 Tailwind CDN 加载样式，完整外观依赖外网。
+- HTML、CSS 和原生 JS 均内置于 `INDEX.html`。页面不加载 Tailwind CDN 或其他外部资源，可离线打开。
 - 应用源码只编辑 `INDEX.html`。`npm run build` 清空 `dist/` 并复制生成 `dist/index.html`。不要反向编辑发布产物。
 - CI 工作流 `pages.yml` 依次执行 `npm ci`、`npx playwright install --with-deps chromium`、`npm run verify`，测试对象是当前 EXTRACT 页面，不是 ADDM/ADDMX 需求。push 到 `main` 且检查通过后才上传 `dist` 并部署 Pages；PR 只跑检查，不部署。
 - 输入事件调用 `render()`。`buildModel()` 汇总模型，随后各 `render*()` 更新界面，`genST()` 生成 ST。修改计算规则时，同步检查校验、功能块图、声明表、内存示意图和引脚表。
@@ -34,8 +34,18 @@ npm run verify
 
 - `npm run verify` 先执行 HTML 结构与内联 JS 语法检查，再运行 `npm test`。后者自动重建发布产物，并启动仅监听本机的 4173 端口测试服务器。
 - 单项命令为 `npm run check`、`npm run build`、`npm test`。聚焦用例可用 `npm test -- --grep "SRC_POS 越界"`。
-- 涉及本地 Playwright 多 lane 检测（`npm run test:local`）或截图基线时，先读 README 的“本地检测运行”一节。
-- Chromium 回归在 `dist/index.html` 上执行。测试隔离 Tailwind CDN，只覆盖功能与 ST 输出，不覆盖样式、剪贴板或 PLC 通讯。
+- Chromium 回归在 `dist/index.html` 上执行。现有冒烟用例覆盖功能与 ST 输出，不覆盖样式、剪贴板或 PLC 通讯。用例保留了旧 Tailwind CDN 的拦截规则；当前页面不请求该资源。
 - 当前 EXTRACT 默认示例：源为 10 个 WORD，目标为 20 个 WORD，SRC_POS=2、DST_POS=5、CPY_NELEM=3。预期元素大小为 2 字节，目标容量为 20，状态为“参数有效 · 就绪”。
 - 修改 EXTRACT 模型后，检查 SRC_NELEM 不整除、源位置越界、目标截断、复制数为 0、变量表达式及重置。ST 输入使用 `:=`，输出 DST/ERR 使用 `=>`。
 - 修改布局或复制逻辑后，另做浏览器人工检查。PLC 程序段是否可编译、可通讯，须在 Control Expert 或实际 PLC 环境验证。
+
+### 本地检测（`npm run test:local`）
+
+- 运行本地功能、布局或截图检测前，读取 README 的“本地检测”节。该套件使用页面真实内联 CSS，不恢复 CDN。
+- `tests/local/baselines/win32/` 是用户审批的测试基线，`docs/images/` 是说明截图。两者不能互用，旧 UI 的审批不能用于新版 UI。
+- 实施步骤见 `docs/plans/local-playwright-visual-testing.md`。该计划已获用户批准适配离线页面，完成步骤后同步勾选。
+
+## 贡献与文档同步
+- 修改前读取 `CONTRIBUTING.md`。按其中的文档同步规则，在同一提交或同一 PR 中维护受影响的中英文说明、贡献流程和界面截图。
+- 修改项目事实或约束时，同步更新本文件。说明截图不是视觉测试基线。
+- 用户明确跳过测试时，记录未运行及原因。保留现有 CI 配置，不声称测试通过。

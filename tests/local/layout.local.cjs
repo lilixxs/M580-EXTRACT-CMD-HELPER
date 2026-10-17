@@ -1,5 +1,5 @@
 /**
- * Lane B · 本地布局与几何用例（本地专用：真实 Tailwind 样式 + 离线 fixture 回放）
+ * Lane B · 本地布局与几何用例（本地专用：INDEX.html 内联 CSS 的真实样式 + 本机 127.0.0.1 回放）
  *
  * 覆盖 6 项：
  *  1. 默认示例无页面级水平溢出，FBD／声明表／引脚表由 overflow 宿主约束；
@@ -100,8 +100,9 @@ async function auditScrollHost(page, sel) {
         break;
       }
     }
-    // 表格内容宽度以 <table> 为准（tbody 盒与表盒同宽，但以表盒更稳妥）
-    const widthEl = el.closest('table') || el;
+    // 内容宽度取真实内容盒：表格以 <table> 为准（tbody 盒与表盒同宽）；
+    // 功能块图以 #fbGraphic 内的 .fbd 为准——现行 CSS 下 #fbGraphic 是块级盒、宽度等于宿主，不能代表内容
+    const widthEl = el.closest('table') || el.querySelector('.fbd') || el;
     const er = widthEl.getBoundingClientRect();
     return {
       found: true,
@@ -122,8 +123,11 @@ async function auditScrollHost(page, sel) {
 
 /**
  * 断言元素被 overflow:auto/scroll 宿主约束：
- * 宿主存在、宿主本身不越出视口、内容宽于宿主时宿主必须可滚动。
- * reachable=false 时不断言「内容可完整滚动到达」（居中 flex 宿主的起边溢出按 CSS 规范不可滚动）。
+ * 宿主存在、宿主本身不越出视口、内容宽于宿主时宿主必须可滚动，
+ * 并且内容宽度可被完整滚动到达（reachable=true 为当前所有调用点的前提）。
+ * reachable=false 只留给「内容可能落在起始边、按 CSS 规范不可滚动」的宿主；当前无调用点。
+ * 现行 FBD 结构满足 reachable：.fbd 是块级盒（display:flex 的外层为块级）+ width:max-content + margin:0 auto，
+ * 内容宽于宿主时 auto 外边距按 CSS 2.1 §10.3.3 归零，溢出只出现在结束边，可完整滚动到达。
  */
 async function expectScrollHost(page, sel, { reachable = true } = {}) {
   const h = await auditScrollHost(page, sel);
@@ -144,13 +148,14 @@ async function expectScrollHost(page, sel, { reachable = true } = {}) {
   return h;
 }
 
-/** 页面内测量：变量输入框与其右侧按钮容器的几何关系 */
+/** 页面内测量：变量输入框与其右侧按钮容器（.ctl 内的 div.ctlbar）的几何关系 */
 async function probeField(page, id) {
   return page.evaluate((fieldId) => {
     const input = document.getElementById(fieldId);
     if (!input) return { found: false };
     const wrap = input.parentElement;
-    const group = wrap ? wrap.querySelector('div.absolute') : null;
+    // 现行 CSS：#srcName/#dstName/#errName 均包在 .ctl 内，右侧按钮组是 .ctl 下的 div.ctlbar（absolute，right:4px，垂直居中）
+    const group = wrap ? wrap.querySelector('div.ctlbar') : null;
     const box = (el) => {
       const r = el.getBoundingClientRect();
       return {
@@ -331,7 +336,7 @@ async function expectKindGroups(page, segSel, map, label) {
   }
 }
 
-test.describe('Lane B · 本地布局与几何（真实 Tailwind 样式）', () => {
+test.describe('Lane B · 本地布局与几何（INDEX.html 内联 CSS 真实样式）', () => {
   test('默认示例：无页面级水平溢出，FBD／声明表／引脚表由 overflow 宿主约束', async ({
     page,
   }, testInfo) => {
@@ -339,8 +344,8 @@ test.describe('Lane B · 本地布局与几何（真实 Tailwind 样式）', () 
 
     await expectNoPageOverflow(page);
 
-    // 功能块图：外层 flex 居中 + overflow-x-auto 承接过宽内容
-    await expectScrollHost(page, '#fbGraphic', { reachable: false });
+    // 功能块图：滚动宿主是 .fbd-wrap，内容为 width:max-content 的 .fbd；结束边溢出可完整滚动到达
+    await expectScrollHost(page, '#fbGraphic', { reachable: true });
     // 声明表、引脚表：表宽溢出必须落在 overflow-x-auto 容器内
     await expectScrollHost(page, '#declTbody');
     await expectScrollHost(page, '#pinTbody');
@@ -367,7 +372,7 @@ test.describe('Lane B · 本地布局与几何（真实 Tailwind 样式）', () 
 
     await expectNoPageOverflow(page);
 
-    const fbd = await expectScrollHost(page, '#fbGraphic', { reachable: false });
+    const fbd = await expectScrollHost(page, '#fbGraphic', { reachable: true });
     const decl = await expectScrollHost(page, '#declTbody');
     const pin = await expectScrollHost(page, '#pinTbody');
 

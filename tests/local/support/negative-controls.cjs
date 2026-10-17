@@ -11,7 +11,7 @@ const results = [];
 const controls = [
   { kind: 'bad-st', lane: 'functional', status: 'failed', code: 1, marker: 'BROKEN ST' },
   { kind: 'moved-control', lane: 'layout', status: 'failed', code: 1, marker: 'expect' },
-  { kind: 'missing-style', lane: 'functional', status: 'blocked', code: 2, marker: 'Tailwind fixture missing' },
+  { kind: 'missing-style', lane: 'functional', status: 'blocked', code: 2, marker: 'inline CSS styles required' },
   { kind: 'port-in-use', lane: 'functional', status: 'blocked', code: 2, marker: 'port 4181 unavailable' },
   { kind: 'missing-baseline', lane: 'visual', status: 'baseline-pending', code: 3, marker: 'BASELINE_PENDING' }
 ];

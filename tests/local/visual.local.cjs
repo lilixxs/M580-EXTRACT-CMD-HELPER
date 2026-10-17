@@ -1,10 +1,10 @@
 /**
- * EXTRACT 指令生成工具 INDEX.html —— 本地视觉基线（真实 Tailwind 样式）
+ * EXTRACT 指令生成工具 INDEX.html —— 本地视觉基线（真实内联 CSS）
  * 范围：4 个固定状态 × 2 个 project（chromium-1280x800、chromium-1024x768）= 8 张全页截图。
  * 状态：default / nelem-custom-invalid / truncation / long-name。
  * 边界：本文件不更新正式基线。候选模式只写候选目录；正常模式只比较既有基线，比较由 config 控制
  *       （updateSnapshots=none、baselinePath 由 config 指定）。不得用本文件生成或代审批正式基线。
- * 页面加载、真实本地 Tailwind fixture 回放、样式与默认 ST 守卫、pageerror 与外网请求检查、
+ * 页面加载、内联 CSS 样式与默认 ST 守卫、pageerror 与外网请求检查、
  * 每例证据截图均由 ./support/fixtures.cjs 的 test 钩子提供；进入用例时页面已是 fresh 状态。
  * 视口由本地 config 的两个 project 固定，本文件不设置 viewport，也不重复 mock 或路由。
  */

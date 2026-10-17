@@ -2,23 +2,23 @@
 
 ## Steps
 
-- [x] 基础设施：协调 agent 独占改动 serve/config/编排入口，跑通单 lane 冒烟。
+- [ ] 基础设施：协调 agent 独占改动 serve/config/编排入口，跑通单 lane 冒烟。
 - [ ] 并行套件：3 条 lane 在独立 worktree、独立端口、独立产物目录下并行通过。
-- [x] 基线审核与负例：生成 8 张候选基线交用户审批冻结；5 类负例全部检出。
+- [ ] 基线审核与负例：生成 8 张候选基线交用户审批冻结；5 类负例全部检出。
 - [ ] 整合验收：现有 `npm run verify` 9 项不受影响，汇总产物与 manifest 齐全，3 次同环境一致。
 
 ## 当前依据
 
-- 状态：规划草案，尚未实施。本轮只读调查并编写文档，未新增或运行检测。
-- 分支 `plan/local-playwright-visual` 基于 `origin/main` 的 `4d17ac3`。当前应用是 EXTRACT，不是 ADDM/ADDMX。
-- Node >= 22，Playwright 锁定为 `1.64.1`。`npm test` 先构建 `dist/index.html`，再执行 9 项功能回归。上轮本地与 CI 已通过，本轮未重跑。
-- 当前测试用空脚本替换 Tailwind CDN。配置固定端口 `4173`、单 worker，仅失败时截图，没有截图基线比较。
+- 用户已批准适配最新主分支的离线页面。旧页面的验证与截图审批不计为新版验收，以下步骤重新执行。
+- 分支 `plan/local-playwright-visual` 最初基于 `4d17ac3`，本次整合基于 `origin/main` 的 `0321a5e`。当前应用是 EXTRACT，不是 ADDM/ADDMX。
+- Node >= 22，Playwright 锁定为 `1.64.1`。`npm test` 先构建 `dist/index.html`，再执行 9 项功能回归。
+- 最新页面内置全部 CSS，不加载外部资源。现有冒烟测试保留旧 CDN 拦截但不触发，默认配置固定端口 `4173`、单 worker，仅失败时截图。
 - 依据：`package.json:6-9`、`playwright.config.cjs:5,12-22`、`scripts/serve.cjs:22`、`scripts/build.cjs:6-9`、`tests/smoke.spec.cjs:19-22`。
 
 ## 1 范围与不改边界
 
 - 环境仅限本地 Windows、Chromium，视口仅 `1280x800` 与 `1024x768`。
-- 不修改 `INDEX.html`、DOCX、现有 9 项 smoke、现有 `playwright.config.cjs` 与 CI/Pages 工作流；不新增浏览器引擎。
+- 完整保留最新主分支的 `INDEX.html`、DOCX、现有 9 项 smoke、现有 `playwright.config.cjs` 与 CI/Pages 工作流；本任务不改应用源码，不新增浏览器引擎。
 - 截图与几何断言只覆盖渲染与交互，**不能证明 PLC 通讯或程序段可编译**。
 
 ## 2 基础设施（协调 agent 独占，先于分发固定 commit）
@@ -35,12 +35,12 @@
 - 端口占用即明确报错；`reuseExistingServer=false`；禁止杀未知进程；不得声称 worktree 隔离端口本身。
 - 执行期间冻结源码与共享配置；禁止同目录并发 `npm test`。
 
-## 4 真实样式 fixture（禁止空脚本基线）
+## 4 真实内联 CSS（禁止无样式基线）
 
-- 仅测试层 `route.fulfill` 注入一次性缓存的真实 Tailwind CDN 脚本 `tests/local/support/vendor/tailwind.js`；测试运行禁止外网，资源白名单之外的 HTTP 请求全部阻断并报错。
-- 记录：源 URL、获取时间、版本信息（若响应提供）、SHA256、授权与许可证声明。
-- 运行前核验 fixture hash；CSS computedStyle 守卫对照当前类（如 body `bg-stone-100` 背景、默认卡片 `rounded-2xl` 圆角），动态错误/警告态亦检查对应样式；**守卫失败 = 检测受阻，不得记为通过或 skip**。
-- 缓存只在准备阶段联网获取，更新须经人工批准。检测阶段仅允许本机服务请求和 fixture 回放，不改线上页。
+- 使用 `INDEX.html` 自带的内联 CSS。移除旧版 Tailwind fixture 与 CDN 回放，不添加任何外部资源。
+- 记录源 HTML 与内联 CSS 的 SHA256。临时 worktree 从已有 npm 缓存离线准备依赖，浏览器只允许本机页面请求。
+- computedStyle 守卫核对画布背景 `#FAF9F5`、卡片直角、状态徽标的通过/警告/失败配色。**守卫失败 = 检测受阻，不得记为通过或 skip**。
+- 样式负例仅在测试响应中剥离内联 `<style>`，不得编辑 `INDEX.html` 或修改线上页面。
 
 ## 5 三 lane 责任分工（general agent 实现，文件互不重叠）
 
@@ -58,7 +58,7 @@
 ## 6 证据与产物
 
 - 成功与失败均收证据：`artifacts/local-check/<run-id>/<lane>/` 下 `html`、`results`、`screenshots`；各 worktree 天然隔离，协调者按清单汇总至自己目录的相同 run-id，不覆盖。
-- 根 `summary.json` 由协调者单写。manifest 含：commit、源码 hash、OS 版本、Node/Playwright/浏览器版本、字体、viewport、style fixture hash、端口、lane、用例与基线 hash。
+- 根 `summary.json` 由协调者单写。manifest 含：commit、源码 hash、OS 版本、Node/Playwright/浏览器版本、字体、viewport、内联 CSS hash、端口、lane、用例与基线 hash。
 - `.gitignore` 增加 `artifacts/` 由协调者改（本轮不改）。基线固定为 `tests/local/baselines/win32/<project-name>/<case>.png`。项目名为 `chromium-1280x800` 和 `chromium-1024x768`。
 - 首次候选只写入 `artifacts/.../baseline-candidates`，不写正式基线目录。候选生成成功不等于视觉回归通过。
 
@@ -68,12 +68,12 @@
 - 瞬态复制反馈用可控时钟：先断言复制文本与按钮状态，再留截图证据。
 - 无基线时明确报告“基线待审”，不得判视觉通过；正常比较 `updateSnapshots: none`、`ignoreSnapshots: false`。
 - 首次仅生成候选，用户审核 8 张后冻结；后续更新须用户明确授权。禁止为消除红灯改基线、裁掉核心区域或放宽阈值；初始 `maxDiffPixels: 0`（颜色 threshold 采用文档默认值，不宣称零颜色容差）。固定环境下验证连续 3 次一致。
-- 仅比较同一环境的基线。OS、浏览器、字体或样式 fixture 变化时停止沿用旧基线，重新提交候选供审核。Windows 基线不进入现有 Ubuntu CI。
+- 仅比较同一环境的基线。OS、浏览器、字体或内联 CSS 变化时停止沿用旧基线，重新提交候选供审核。Windows 基线不进入现有 Ubuntu CI。
 
 ## 8 验收与负例
 
 - 现有 `npm run verify` 仍 9 项通过；3 lane 本地 `retries=0`，退出码正确汇总，任意功能/几何/截图失败均退出非 0；同环境 3 次结果一致。
-- 5 类负例必须检出：① 测试层篡改生成的 ST；② 测试层注入 CSS 移动控件；③ fixture 缺失；④ 端口占用；⑤ 基线缺失。负例只作用于专用临时 worktree 或测试页面，不编辑业务源文件或破坏正式夹具。
+- 5 类负例必须检出：① 测试层篡改生成的 ST；② 测试层注入 CSS 移动控件；③ 测试响应缺少内联 CSS；④ 端口占用；⑤ 基线缺失。负例只作用于专用临时 worktree 或测试页面，不编辑业务源文件或破坏正式基线。
 - 成功须有 8 张基线的比较证据。图像不匹配时保留 expected/actual/diff 与 trace；其他失败保留可取得的截图与 trace，不伪造不存在的期望图。
 - 汇总区分通过、断言失败、环境受阻、基线待审、未执行。后三类不能记为通过。除全部必选检测通过外，编排入口均返回非 0；未获授权的真实剪贴板检测单独列为未执行。
 - 必选套件禁用 `.only`、`.skip` 和 `.fixme`。零用例、缺失 lane 报告或缺失必需截图均不能形成通过结论。
@@ -81,10 +81,10 @@
 
 ## 9 本轮边界
 
-- 不提交、不推送、不部署；仅创建本地分支与本文档，等待用户审阅后再实施。
+- 用户已授权实施，并在验收通过后合并推送。新版 8 张候选仍需用户明确审批，不能复用旧版页面的审批。
 
 ## 实施前检查
 
-- 首次获取 Tailwind fixture 时核实授权与许可证声明。未确认可缓存并分发前，不将 vendor 文件入库。
-- 明确用户已批准实施，并保留首次基线审批步骤。本轮创建分支不代表已授权后续提交、推送或发布。
+- 合并前核对应用源码与最新主分支逐字节一致，不恢复旧版 UI 或 CDN。
+- 保留新版基线审批步骤；README 与 CONTRIBUTING 的中英文说明须同步，文档说明图与测试基线分开管理。
 - 官方依据：[截图比较](https://playwright.dev/docs/test-snapshots)、[本地资源回放](https://playwright.dev/docs/api/class-route#route-fulfill)。
