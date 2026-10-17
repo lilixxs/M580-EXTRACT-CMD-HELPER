@@ -12,7 +12,13 @@
 
 `INDEX.html` 是一个 **EXTRACT 指令生成工具**：填写源变量、目标变量、位置和复制数量，页面给出参数校验、功能块图、变量声明表、复制数据示意图、引脚说明表，并生成 ST 程序段。
 
-`ADDMX地址生成解析工具.docx` 记录的是 ADDM/ADDMX 寻址工具的需求演变。当前页面**不是**该工具，两者差异是有意保留的现状。
+页面为单文件、离线自包含：不加载任何外部脚本、样式或图片（无 CDN、无网络依赖），字体仅使用本机字体栈。
+
+## 历史背景
+
+本项目源自历史上的 ADDM/ADDMX 寻址工具需求讨论。当前页面实现的是 EXTRACT 指令生成工具，并非该 ADDM/ADDMX 工具；这一差异是有意保留的现状。
+
+记录该需求演变的历史 DOCX 文档**不纳入**当前仓库快照（仅由维护者本地保留），它也不是 PLC 官方手册。历史提交未重写，GitHub 提交历史中仍可能存在这些文件。
 
 ## 界面截图
 
@@ -34,8 +40,8 @@
 
 - 源/目标变量支持四种形式：数组、基本类型、STRING、DDT/自定义。
 - 元素划分（SRC_NELEM）三种方式：与源变量类型相同、字节数（`SIZEOF()` 函数）、自定义值。
+- 元素大小由「源字节数 ÷ SRC_NELEM」得出；目标容量按 `floor(目标字节数 ÷ 元素大小)` 计算，不一定等于目标数组的元素数。
 - `SRC_POS` / `DST_POS` 是**从 0 开始的元素偏移**，不是数组声明下标。例如 `ARRAY[5..14]` 中 `SRC_POS = 2` 对应下标 7。
-- 目标容量按「目标字节数 ÷ 元素大小」计算，不一定等于目标数组的元素数。
 - `SRC_POS`、`DST_POS`、`CPY_NELEM` 支持填入变量名等非整数文本，按运行时表达式处理并原样写入 ST。
 - 实时输出：参数校验（对应 ERR 运行时错误预判）、功能块图、变量声明表、复制数据示意图、引脚说明表、ST 程序段。
 - 源变量名、目标变量名、ERR 变量名三个字段提供复制与清空按钮；程序段有复制按钮；「重置为示例」恢复默认参数。
@@ -68,49 +74,55 @@ EXTRACT(SRC       := SrcArray,
 
 ## 本地运行
 
+首次使用时，克隆仓库：
+
+```bash
+git clone https://github.com/lilixxs/M580-EXTRACT-CMD-HELPER.git
+cd M580-EXTRACT-CMD-HELPER
+```
+
 使用应用本身无需任何构建：直接打开 `INDEX.html`。
 
-开发与验证需要 Node >= 22，在项目根目录执行：
+开发与静态检查需要 Node >= 22。在项目根目录执行：
 
 ```bash
 npm ci
-npx playwright install chromium
 npm run verify
 ```
 
-各脚本含义（见 `package.json`）：
+`npm run verify` 只做静态检查与构建，不运行浏览器测试。各脚本含义（见 `package.json`）：
 
 | 命令 | 作用 |
 | --- | --- |
-| `npm run check` | 运行 `scripts/check.cjs`：断言 HTML 结构（doctype、lang、charset、title、结尾），并用 `node:vm` 编译全部内联脚本做语法检查 |
+| `npm run check` | 运行 `scripts/check.cjs`：断言 HTML 结构（doctype、lang、charset、title、结尾），并用 `node:vm` 编译全部内联脚本做语法静态检查 |
 | `npm run build` | 运行 `scripts/build.cjs`：清空 `dist/`，把 `INDEX.html` 复制为 `dist/index.html`（发布产物，不可反向编辑） |
-| `npm test` | `npm run build && playwright test`；`playwright.config.cjs` 自动启动 `scripts/serve.cjs`（仅监听 `127.0.0.1:4173`），在 chromium 中打开 `dist/index.html` |
-| `npm run verify` | `npm run check` + `npm test` |
+| `npm run serve` | 运行 `scripts/serve.cjs`：在 `127.0.0.1:4173` 提供本地**预览**服务器；须先执行 `npm run build`；仅监听本机，非测试服务器 |
+| `npm run verify` | `npm run check` && `npm run build` |
 
-聚焦单个用例：`npm test -- --grep "SRC_POS 越界"`。若直接执行 `npx playwright test`，须先运行 `npm run build`。
+`npm test` 不是公开定义的脚本。
 
-## 自动化测试范围
+## 浏览器自动化测试（当前状态）
 
-仓库现有 9 个冒烟用例（`tests/smoke.spec.cjs`），覆盖默认 ST 输出、派生信息、参数联动、不整除、越界、目标截断、`CPY_NELEM = 0`、变量表达式与重置。
+当前仓库快照**不含**可复现的公开自动浏览器测试：`playwright.config.cjs` 与 `tests/` 未纳入仓库，仅在维护者本地保留。
 
-- 不覆盖：页面样式、剪贴板行为、真实 PLC 通讯与程序段在 Control Expert 中的编译。
-- 用例保留了针对旧 Tailwind CDN 的网络拦截规则；当前页面不请求任何外部资源，该拦截为空操作。
+- 维护者本地可用保留的 Playwright 用例作为额外检查，但它们不属于仓库公开内容，也不在 CI 中运行；不得据此宣称 CI 运行或通过了浏览器用例。
+- 本地保留的冒烟用例不覆盖页面样式、剪贴板行为、真实 PLC 通讯，以及程序段在 Control Expert 中的编译；静态 `npm run verify` 不执行页面行为。
 
 ## CI 与发布
 
 工作流：`.github/workflows/pages.yml`。
 
-- 触发条件：push 到 `main`、针对 `main` 的 PR、手动 `workflow_dispatch`。**没有配置路径过滤**，因此只改文档的 push 也会触发完整检查（并可能触发部署）。
-- push 到 `main`：`npm ci` → `npx playwright install --with-deps chromium` → `npm run verify`。仅当事件不是 PR 时，才上传 `dist/` 并执行 Pages 部署。CI 使用 Node 24。
-- PR：只跑检查，不部署。
+- 触发条件：push 到 `main`、针对 `main` 的 PR、手动 `workflow_dispatch`。**没有配置路径过滤**，因此仅修改文档的 `main` 分支 push 也会触发检查与构建。
+- CI 在 Node 24 上执行 `npm ci` → `npm run verify`（即 `npm run check` + `npm run build`）。CI **不**安装 chromium、**不**运行浏览器测试、**不**上传测试失败报告。
+- `main` 上的 push 或手动执行通过检查后：上传 `dist/` 并执行 Pages 部署。PR：只检查和构建，不部署。推送普通任务分支不会触发此工作流。
 - 预期站点地址（取决于仓库 Pages 配置，是否可访问以 Actions 运行结果为准）：<https://lilixxs.github.io/M580-EXTRACT-CMD-HELPER/>；运行记录见 [Actions](https://github.com/lilixxs/M580-EXTRACT-CMD-HELPER/actions)。
-- 发布产物只含 `dist/index.html`。DOCX、规则文档、测试与仓库文件不会进入网站；但仓库本身是公开的，仓库内文件对任何人可见。
+- 发布产物只含 `dist/index.html`。仓库文件不进入网站；但仓库本身是公开的，仓库内文件对任何人可见。
 
 ## 验证边界与已知限制
 
 - 页面内的类型字节大小表是**页面估算**，不是所有 PLC 平台的内存布局保证。
 - 生成的 ST 程序段**未**在 Control Expert 或真实 PLC 上编译、通讯验证；PLC 相关结论须以官方文档与实际环境为准。
-- `ADDMX地址生成解析工具.docx` 是历史需求对话，不是 PLC 官方手册。
+- `npm run verify` 只覆盖 HTML 结构、内联 JS 语法与发布产物构建，不覆盖页面行为。
 - 无 lint 与 typecheck 配置。
 
 ## 目录结构
@@ -118,22 +130,29 @@ npm run verify
 | 路径 | 说明 |
 | --- | --- |
 | [`INDEX.html`](INDEX.html) | 应用唯一入口与全部源码（HTML/CSS/原生 JS，内联自包含） |
-| [`package.json`](package.json) | npm 脚本与 Node 版本要求（>= 22） |
-| [`playwright.config.cjs`](playwright.config.cjs) | Playwright 配置：chromium、单 worker、本地测试服务器 |
-| [`scripts/check.cjs`](scripts/check.cjs) | HTML 结构与内联 JS 语法检查 |
+| [`package.json`](package.json) | npm 脚本、Node 版本要求（>= 22）与 MIT 许可声明 |
+| [`scripts/check.cjs`](scripts/check.cjs) | HTML 结构与内联 JS 语法静态检查 |
 | [`scripts/build.cjs`](scripts/build.cjs) | 生成发布产物 `dist/index.html` |
-| [`scripts/serve.cjs`](scripts/serve.cjs) | 仅监听本机 4173 端口的测试服务器 |
-| [`tests/smoke.spec.cjs`](tests/smoke.spec.cjs) | 9 个冒烟用例 |
+| [`scripts/serve.cjs`](scripts/serve.cjs) | 仅监听本机 4173 端口的预览服务器 |
 | [`.github/workflows/pages.yml`](.github/workflows/pages.yml) | CI 检查与 Pages 发布工作流 |
 | [`docs/images/`](docs/images/) | README 说明截图 |
-| [`AGENTS.md`](AGENTS.md) | 项目事实与修改约束 |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 贡献流程与文档同步规则 |
-| [`claude_code_light_ui_style_guide.md`](claude_code_light_ui_style_guide.md) | 当前界面遵循的浅色直角风格指南 |
-| `ADDMX地址生成解析工具.docx` | 历史需求对话（非官方手册） |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 贡献流程、公共修改约束与文档同步规则 |
+| [`LICENSE`](LICENSE) | MIT 许可证全文 |
+| [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | 第三方内容与商标说明 |
+
+## 版权与许可
+
+- 本仓库以 [MIT 许可](LICENSE) 发布，版权 (c) 2026 lilixxs。
+- MIT 覆盖本仓库中由维护者拥有或已获授权的代码、文案与文档截图（含页面内 SVG 按钮的基础几何）。
+- `INDEX.html` 内保留 MIT 版权与许可全文。构建后的单文件页面也保留该声明。
+- MIT **不**覆盖：第三方手册及其版权（Schneider Electric 相关文档的使用条款见其官网）、第三方商标、以及历史提交中已从当前快照排除的材料（如历史 DOCX）。详见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+- 维护者的权属确认是本仓库按 MIT 发布的依据，不是对全部代码来源的独立审计证明；本项目不作零风险承诺。
 
 ## 贡献
 
-请阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)：包含分支与改动边界、验证要求、README 两语言/截图/AGENTS 的同步规则，以及 PR 描述要求。
+请阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)：包含公共修改约束、分支与改动边界、验证要求、README 两语言/截图的同步规则，以及 PR 描述要求。
+
+本文件与贡献指南均先写中文全文，再写英文全文。修改时必须在同一提交或 PR 中同步相关的中英文内容。
 
 ---
 
@@ -145,7 +164,13 @@ npm run verify
 
 `INDEX.html` is an **EXTRACT instruction generator**. Fill in the source variable, the destination variable, positions and the copy count. The page produces parameter checks, a function block diagram, a variable declaration table, a copy-data diagram, a pin reference table and an ST code snippet.
 
-`ADDMX地址生成解析工具.docx` records the requirement history of an ADDM/ADDMX addressing tool. The current page is **not** that tool. The difference is intentionally kept.
+The page is a single self-contained file that works offline. It loads no external script, stylesheet or image (no CDN, no network dependency) and uses only the local system font stack.
+
+## History
+
+This project grew out of an earlier requirement discussion for an ADDM/ADDMX addressing tool. The current page implements an EXTRACT instruction generator, not that ADDM/ADDMX tool. The difference is intentionally kept.
+
+The historical DOCX that records that requirement evolution is **not** part of the current repository snapshot (it is kept locally by the maintainer) and is not an official PLC manual. Historical commits were not rewritten, so these files may still appear in the GitHub commit history.
 
 ## Screenshots
 
@@ -167,8 +192,8 @@ The screenshots were taken by opening the current `INDEX.html` default example d
 
 - Source and destination variables support four forms: array, elementary type, STRING and DDT/custom.
 - Element partitioning (SRC_NELEM) has three modes: same as the source type, byte count via the `SIZEOF()` function, and a custom value.
+- The element size is derived as source bytes divided by SRC_NELEM. The destination capacity is computed as `floor(destination bytes ÷ element size)`. It does not necessarily equal the destination array's element count.
 - `SRC_POS` / `DST_POS` are **zero-based element offsets**, not array declaration indices. Example: in `ARRAY[5..14]`, `SRC_POS = 2` corresponds to index 7.
-- Destination capacity is computed as destination bytes divided by element size. It does not necessarily equal the destination array's element count.
 - `SRC_POS`, `DST_POS` and `CPY_NELEM` accept non-integer text such as variable names. Such values are treated as runtime expressions and written into the ST snippet verbatim.
 - Live outputs: parameter checks (previewing runtime ERR codes), function block diagram, variable declaration table, copy-data diagram, pin reference table and ST snippet.
 - The source name, destination name and ERR name fields have copy and clear buttons. The code snippet has a copy button. "重置为示例" (reset to example) restores the default parameters.
@@ -201,49 +226,55 @@ EXTRACT(SRC       := SrcArray,
 
 ## Running locally
 
+For first use, clone the repository:
+
+```bash
+git clone https://github.com/lilixxs/M580-EXTRACT-CMD-HELPER.git
+cd M580-EXTRACT-CMD-HELPER
+```
+
 Using the application requires no build step: open `INDEX.html` directly.
 
-Development and verification require Node >= 22. From the project root:
+Development and static checks require Node >= 22. From the project root:
 
 ```bash
 npm ci
-npx playwright install chromium
 npm run verify
 ```
 
-What each script does (see `package.json`):
+`npm run verify` performs static checks and a build only. It runs no browser tests. What each script does (see `package.json`):
 
 | Command | Purpose |
 | --- | --- |
 | `npm run check` | Runs `scripts/check.cjs`. It asserts HTML structure (doctype, lang, charset, title, closing tags) and compiles all inline scripts with `node:vm` for syntax checking. |
 | `npm run build` | Runs `scripts/build.cjs`. It clears `dist/` and copies `INDEX.html` to `dist/index.html` (the publish artifact, do not edit it directly). |
-| `npm test` | Runs `npm run build && playwright test`. `playwright.config.cjs` starts `scripts/serve.cjs` (listens on `127.0.0.1:4173` only) and opens `dist/index.html` in chromium. |
-| `npm run verify` | Runs `npm run check` and then `npm test`. |
+| `npm run serve` | Runs `scripts/serve.cjs`. It serves a local **preview** on `127.0.0.1:4173`. Run `npm run build` first. It listens on the local machine only and is not a test server. |
+| `npm run verify` | Runs `npm run check` and then `npm run build`. |
 
-To focus a single case, run `npm test -- --grep "SRC_POS 越界"`. If you run `npx playwright test` directly, run `npm run build` first.
+`npm test` is not a publicly defined script.
 
-## Automated test scope
+## Browser automation tests (current state)
 
-The repository has 9 smoke tests in `tests/smoke.spec.cjs`. They cover the default ST output, derived values, parameter linkage, non-divisible SRC_NELEM, out-of-range positions, destination truncation, `CPY_NELEM = 0`, variable expressions and reset.
+The current repository snapshot contains **no** reproducible public automated browser tests. `playwright.config.cjs` and `tests/` are not part of the repository; they are kept locally by the maintainer.
 
-- Not covered: page styling, clipboard behavior, real PLC communication and compilation of the snippet in Control Expert.
-- The tests keep an interception rule for the old Tailwind CDN. The current page requests no external resource, so the rule is a no-op.
+- The maintainer may still run the retained Playwright cases locally as an extra check. They are not public repository content and are not run in CI. Never claim that CI runs or passes browser cases.
+- The locally retained smoke cases do not cover page styling, clipboard behavior, real PLC communication, or compilation of the snippet in Control Expert. The static `npm run verify` executes no page behavior.
 
 ## CI and publishing
 
 Workflow: `.github/workflows/pages.yml`.
 
-- Triggers: push to `main`, pull requests against `main` and `workflow_dispatch`. **No path filters are configured**, so a docs-only push also runs the full check and may trigger deployment.
-- Push to `main`: `npm ci` → `npx playwright install --with-deps chromium` → `npm run verify`. Only when the event is not a PR does it upload `dist/` and run the Pages deployment. CI uses Node 24.
-- Pull requests: checks only, no deployment.
+- Triggers: push to `main`, pull requests against `main` and `workflow_dispatch`. **No path filters are configured**, so a docs-only push to `main` also runs checks and the build.
+- CI runs on Node 24: `npm ci` → `npm run verify` (that is `npm run check` + `npm run build`). CI does **not** install chromium, does **not** run browser tests and does **not** upload test failure reports.
+- After a push or manual run on `main` passes checks, upload `dist/` and deploy Pages. Pull requests run checks and the build without deploying. Pushing a normal task branch does not trigger this workflow.
 - Expected site URL: <https://lilixxs.github.io/M580-EXTRACT-CMD-HELPER/>. It depends on the repository Pages configuration. Consult the [Actions](https://github.com/lilixxs/M580-EXTRACT-CMD-HELPER/actions) runs for actual availability.
-- The published artifact contains only `dist/index.html`. The DOCX, rule documents, tests and repository files do not enter the website. The repository itself is public, so repository files are visible to anyone.
+- The published artifact contains only `dist/index.html`. Repository files do not enter the website. The repository itself is public, so repository files are visible to anyone.
 
 ## Verification boundaries and known limits
 
 - The type byte-size table in the page is a **page-level estimate**. It is not a guarantee of memory layout on every PLC platform.
 - The generated ST snippet has **not** been compiled or communication-tested in Control Expert or on a real PLC. PLC conclusions must come from official documentation and the actual environment.
-- `ADDMX地址生成解析工具.docx` is a historical requirement conversation, not an official PLC manual.
+- `npm run verify` covers only HTML structure, inline JavaScript syntax and building the publish artifact. It does not cover page behavior.
 - No lint or typecheck configuration exists.
 
 ## Repository layout
@@ -251,19 +282,26 @@ Workflow: `.github/workflows/pages.yml`.
 | Path | Description |
 | --- | --- |
 | [`INDEX.html`](INDEX.html) | The only application entry point and all source code (HTML/CSS/vanilla JS, self-contained inline) |
-| [`package.json`](package.json) | npm scripts and Node version requirement (>= 22) |
-| [`playwright.config.cjs`](playwright.config.cjs) | Playwright config: chromium, single worker, local test server |
-| [`scripts/check.cjs`](scripts/check.cjs) | HTML structure and inline JS syntax checks |
+| [`package.json`](package.json) | npm scripts, Node version requirement (>= 22) and the MIT license declaration |
+| [`scripts/check.cjs`](scripts/check.cjs) | HTML structure and inline JS syntax static checks |
 | [`scripts/build.cjs`](scripts/build.cjs) | Produces the publish artifact `dist/index.html` |
-| [`scripts/serve.cjs`](scripts/serve.cjs) | Test server listening on port 4173, local host only |
-| [`tests/smoke.spec.cjs`](tests/smoke.spec.cjs) | 9 smoke tests |
+| [`scripts/serve.cjs`](scripts/serve.cjs) | Preview server listening on port 4173, local host only |
 | [`.github/workflows/pages.yml`](.github/workflows/pages.yml) | CI check and Pages publishing workflow |
 | [`docs/images/`](docs/images/) | Documentation screenshots for this README |
-| [`AGENTS.md`](AGENTS.md) | Project facts and modification constraints |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution workflow and documentation sync rules |
-| [`claude_code_light_ui_style_guide.md`](claude_code_light_ui_style_guide.md) | The light, square-corner UI style guide the page follows |
-| `ADDMX地址生成解析工具.docx` | Historical requirement conversation (not an official manual) |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution workflow, shared modification constraints and documentation sync rules |
+| [`LICENSE`](LICENSE) | Full MIT license text |
+| [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | Third-party content and trademark notices |
+
+## Copyright and license
+
+- This repository is published under the [MIT License](LICENSE), copyright (c) 2026 lilixxs.
+- MIT covers the code, text and documentation screenshots in this repository that the maintainer owns or is authorized to license, including the base geometry of the in-page SVG buttons.
+- `INDEX.html` retains the full MIT copyright and permission text. The built single-file page retains the same notice.
+- MIT does **not** cover third-party manuals and their copyrights (see the Schneider Electric terms of use on its official website), third-party trademarks, or materials excluded from the current snapshot in historical commits (such as the historical DOCX). See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+- The maintainer's ownership confirmation is the basis for publishing this repository under MIT. It is not an independent audit proving the provenance of every piece of code. No zero-risk promise is made.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch and change boundaries, verification requirements, sync rules for both README languages, screenshots and AGENTS, and PR description requirements.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for shared modification constraints, branch and change boundaries, verification requirements, sync rules for both README languages and screenshots, and PR description requirements.
+
+This file and the contribution guide keep the full Chinese text first, then the full English text. Update corresponding content in both languages in the same commit or PR.

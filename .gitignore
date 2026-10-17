@@ -1,10 +1,79 @@
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+
+# Historical material retained locally, not included in new snapshots
+/ADDMX地址生成解析工具.docx
+
+# Local tests and test configuration
+tests/
+test/
+__tests__/
+e2e/
+*.test.*
+*.spec.*
+test_*.py
+*_test.py
+playwright.config.*
+vitest.config.*
+jest.config.*
+
+# Test reports and coverage
+playwright-report/
+test-results/
+blob-report/
+coverage/
+.nyc_output/
+
+# Temporary files and local caches
 temp_images/
+tmp/
+temp/
+.cache/
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*.log
+*.swp
+*.swo
+*~
+~$*
+
+# AI instructions and local agent configuration
+AGENTS.md
+AGENTS.local.md
+CLAUDE.md
+CLAUDE.local.md
+GEMINI.md
+claude_code_light_ui_style_guide.md
+.agents/
+.claude/
+.opencode/
+.cursor/
+.clinerules/
+.clinerules
+.cursorrules
+.cursorignore
+.windsurf/
+.windsurfrules
+.aider.conf.yml
+.aider.chat.history.md
+.aider.input.history
+.github/copilot-instructions.md
+.github/instructions/
+/opencode.json
+/opencode.jsonc
+
+# Secrets (keep a sanitized example file)
 .env
 .env.*
 !.env.example
+
+# Local editor and operating system files
+.vscode/
+.idea/
 Thumbs.db
 .DS_Store
-node_modules/
-dist/
-playwright-report/
-test-results/

@@ -3,7 +3,7 @@ const http = require('node:http');
 const path = require('node:path');
 
 const entry = path.join(__dirname, '..', 'dist', 'index.html');
-if (!fs.existsSync(entry)) throw new Error('Run npm run build before starting the test server');
+if (!fs.existsSync(entry)) throw new Error('Run npm run build before starting the preview server');
 
 http.createServer((request, response) => {
   if (!['GET', 'HEAD'].includes(request.method)) {
@@ -19,4 +19,4 @@ http.createServer((request, response) => {
   }
   response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   response.end(request.method === 'HEAD' ? undefined : fs.readFileSync(entry));
-}).listen(4173, '127.0.0.1', () => console.log('Test server: http://127.0.0.1:4173'));
+}).listen(4173, '127.0.0.1', () => console.log('Preview server: http://127.0.0.1:4173'));
