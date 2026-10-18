@@ -1,0 +1,85 @@
+{
+  "approvedBy": "user",
+  "approvedAt": "2026-10-18T00:04:19.967Z",
+  "approvalNote": "User explicitly approved all eight NEW offline-UI screenshots in this session. Old-UI approval is not reused.",
+  "reviewedRunId": "offline-candidates",
+  "verifiedRunId": "offline-candidates",
+  "sourceCommit": "9e8958755eccf4a78d3824b97ffea897c9795647",
+  "sourceSha256": "0f6c8b3ba0db5c9e40be93be42ed7e6f1276ab83cbeb8379bb69ac7b0204eda4",
+  "environment": {
+    "platform": "win32",
+    "osRelease": "10.0.26200",
+    "osVersion": "Windows 11 Pro",
+    "node": "v22.23.2",
+    "playwright": "1.64.1",
+    "browser": "156.0.8078.4",
+    "fonts": {
+      "count": 562,
+      "inventoryHash": "ab06331d720372cdfbf047a989aae86179e1168033ed473dae03c1a21831b203"
+    },
+    "styleSource": "INDEX.html inline CSS",
+    "styleSha256": "2275f6994907d5ea15d39c2cc9c86336a1f85a1668038be21dcc77b3689c45e0",
+    "dpr": 1,
+    "locale": "zh-CN",
+    "colorScheme": "light"
+  },
+  "environmentHash": "983aaf2a7f4b4ab64157292150802b6785d20f7d6f00e3223250d2f12e7e4a1f",
+  "files": [
+    {
+      "path": "chromium-1280x800/default.png",
+      "sha256": "f9c953547d84dc281a92407375508f0e073dc46e90a5ce84095bbd00a43abb38",
+      "bytes": 298089,
+      "width": 1280,
+      "height": 4106
+    },
+    {
+      "path": "chromium-1280x800/nelem-custom-invalid.png",
+      "sha256": "4acd5da8379c200ec0ff0b95b5c966fcbaa12c84102b0130ae0db0de58c56314",
+      "bytes": 297508,
+      "width": 1280,
+      "height": 4085
+    },
+    {
+      "path": "chromium-1280x800/truncation.png",
+      "sha256": "58279935fe567d8cfdbc96674e7b56af31875a747e16818e7098fda688f302c4",
+      "bytes": 304266,
+      "width": 1280,
+      "height": 4106
+    },
+    {
+      "path": "chromium-1280x800/long-name.png",
+      "sha256": "1391fc3d923c03127c1be0b18d1e6df39ce2e2c40299c0cbba5ca1242ed89bb1",
+      "bytes": 363431,
+      "width": 1280,
+      "height": 4311
+    },
+    {
+      "path": "chromium-1024x768/default.png",
+      "sha256": "ff380bf78001a6a9c0d4a6217b95556eac81a60dd81d4d446c44976bfe1d24ad",
+      "bytes": 293204,
+      "width": 1024,
+      "height": 4106
+    },
+    {
+      "path": "chromium-1024x768/nelem-custom-invalid.png",
+      "sha256": "b232aecbde48f62e44091c0ae83699023ea1e03549ce691fdd62b12285b3abbf",
+      "bytes": 292320,
+      "width": 1024,
+      "height": 4085
+    },
+    {
+      "path": "chromium-1024x768/truncation.png",
+      "sha256": "56e3320ca198aba470621d5928bf9420f166fa0948433866f80c439e7f8bfc38",
+      "bytes": 299128,
+      "width": 1024,
+      "height": 4106
+    },
+    {
+      "path": "chromium-1024x768/long-name.png",
+      "sha256": "8d4750c12e1c961ffd139bd5452b3a5248b36f5f7c59b46c07a3a70e77a6b42a",
+      "bytes": 359123,
+      "width": 1024,
+      "height": 4329
+    }
+  ]
+}

@@ -105,19 +105,19 @@ npm run verify
 前提与行为：
 
 - 环境限定 Windows + Chromium，视口固定 `1280×800` 与 `1024×768`（Playwright 项目名 `chromium-1280x800`、`chromium-1024x768`）。
-- 运行前工作区必须干净：存在未提交改动时以 `ENV_BLOCKED` 退出，不会自动提交、暂存或修改工作区。
+- 运行前工作区必须干净：存在未提交改动时以 `ENV_BLOCKED` 退出。不自动提交或暂存，不修改应用源码。检测证据写入已忽略的 `artifacts/`。
 - 首次准备：`npm ci` 与 `npx playwright install chromium`。编排在每个 worktree 内用 `npm ci --offline --ignore-scripts` 安装依赖，检测阶段不联网。
-- 浏览器只允许请求本机页面 `/index.html`，其余请求一律阻断并计为受阻；样式守卫核对 `INDEX.html` 的真实内联 CSS（body 背景 `rgb(250, 249, 245)`、区块直角、状态徽标颜色），不注入 CDN 或 vendor 脚本。
+- 浏览器只允许请求本机页面 `/`、`/index.html`，其余请求一律阻断并计为受阻。样式守卫核对 `INDEX.html` 的真实内联 CSS（body 背景 `rgb(250, 249, 245)`、区块直角、状态徽标颜色），不注入 CDN 或 vendor 脚本。
 - 参数：`--lane functional|layout|visual` 聚焦单条 lane；`--run-id <id>` 指定唯一运行标识，标识重复即拒绝执行；`--candidates` 只生成候选基线。
 - 退出码：`0` 通过、`1` 断言失败、`2` 环境受阻、`3` 基线待审。受阻与基线待审都**不是**通过。
-- 产物：`artifacts/local-check/<run-id>/summary.json` 为汇总；各 lane 下有 `html/`、`results/`、`screenshots/` 与 `logs/<lane>.log`。临时 worktree 保留供审计，不自动删除。
+- 产物：`artifacts/local-check/<run-id>/summary.json` 为汇总，日志位于同级 `logs/<lane>.log`。各 lane 下有 `html/`、`results/`、`screenshots/`。临时 worktree 保留供审计，不自动删除。
 - 剪贴板默认 mock：`navigator.clipboard.writeText` 与 `document.execCommand` 被替换为记录器，不写入系统剪贴板；真实系统剪贴板检测未执行。
 
 视觉基线：
 
 - 基线路径固定为 `tests/local/baselines/win32/<project>/<case>.png`，附 `manifest.json` 审批记录。基线只能与同一 OS、字体、浏览器环境比对，不能跨环境共用；不自动更新，不放宽比较阈值。
 - `npm run test:local -- --candidates` 只生成 8 张候选（默认示例、自定义 SRC_NELEM 无效、目标截断、长变量名 × 2 视口），返回 `baseline-pending`（退出码 `3`），**不记为视觉通过**。
-- 用户此前批准的是旧 UI 的 8 张基线，对当前 `main` 的页面**不适用**。当前正在为新页面重新生成 8 张候选，需用户重新批准写入基线目录后，才能进行正常比较（同一环境连续 3 次一致）。在此之前不得声称视觉检测通过。
+- 当前内联 CSS 页面的 8 张基线已获用户确认，审批记录见 `manifest.json`。后续 UI 变化须重新生成候选并取得用户批准，不能复用旧 UI 的审批。运行结论以本次 `summary.json` 为准。
 
 检测器自检（验证检测器有效，不等于产品通过）：
 
@@ -271,19 +271,19 @@ The repository has 9 smoke tests in `tests/smoke.spec.cjs`. They cover the defau
 Prerequisites and behaviour:
 
 - The environment is limited to Windows + Chromium, with fixed viewports `1280×800` and `1024×768` (Playwright projects `chromium-1280x800` and `chromium-1024x768`).
-- The working tree must be clean before running. Any uncommitted change aborts with `ENV_BLOCKED`. Nothing is auto-committed, staged or modified.
+- The working tree must be clean before running. Uncommitted changes cause `ENV_BLOCKED`. The tool does not stage or commit changes. It preserves application source and writes evidence under the ignored `artifacts/` directory.
 - First-time setup: `npm ci` and `npx playwright install chromium`. Inside each worktree the orchestrator runs `npm ci --offline --ignore-scripts`; the check phase uses no network.
-- The browser may only request the local page `/index.html`; any other request is aborted and counted as blocked. A style guard verifies the real inline CSS of `INDEX.html` (body background `rgb(250, 249, 245)`, square corners, status badge colours). No CDN or vendor script is injected.
+- The browser only permits local page requests to `/` and `/index.html`. Other requests are aborted and counted as blocked. A style guard checks the real inline CSS of `INDEX.html`: canvas colour, square corners and status badge colours. No CDN or vendor script is injected.
 - Options: `--lane functional|layout|visual` focuses one lane; `--run-id <id>` sets a unique run identifier (a duplicate ID is refused); `--candidates` generates candidate baselines only.
 - Exit codes: `0` passed, `1` failed, `2` blocked, `3` baseline-pending. Blocked and baseline-pending are **not** passes.
-- Artifacts: `artifacts/local-check/<run-id>/summary.json` is the summary; each lane writes `html/`, `results/`, `screenshots/` and `logs/<lane>.log`. Temporary worktrees are retained for audit and not deleted automatically.
+- The summary is `artifacts/local-check/<run-id>/summary.json`. Logs are stored alongside it under `logs/<lane>.log`. Each lane writes `html/`, `results/` and `screenshots/`. Temporary worktrees remain available for audit and are not deleted automatically.
 - The clipboard is mocked by default: `navigator.clipboard.writeText` and `document.execCommand` are replaced by recorders and never touch the system clipboard. Real system clipboard detection has not been executed.
 
 Visual baselines:
 
 - Baselines live at `tests/local/baselines/win32/<project>/<case>.png` with an approval record in `manifest.json`. A baseline is only comparable within the same OS, font and browser environment; it is never shared across environments, never auto-updated and never relaxed in tolerance.
 - `npm run test:local -- --candidates` generates only the 8 candidates (default example, invalid custom SRC_NELEM, destination truncation, long variable name × 2 viewports) and returns `baseline-pending` (exit code `3`). This is **not** a visual pass.
-- The 8 baselines the user approved earlier belong to the old UI and do **not** apply to the current `main` page. New candidates are being regenerated and need a fresh user approval before they are written into the baseline directory and normal comparison (3 consistent runs in the same environment) can start. Until then, no visual pass may be claimed.
+- The user approved the eight baselines for the current inline-CSS page. The approval record is in `manifest.json`. UI changes require new candidates and explicit user approval. An old UI approval cannot approve a new UI. Use the current `summary.json` for the run verdict.
 
 Detector self-checks (they validate the detector, not the product):
 

@@ -106,7 +106,7 @@ async function auditScrollHost(page, sel) {
     const er = widthEl.getBoundingClientRect();
     return {
       found: true,
-      measured: widthEl.id || widthEl.tagName.toLowerCase(),
+      measured: widthEl.matches('.fbd') ? '.fbd' : (widthEl.id || widthEl.tagName.toLowerCase()),
       hostFound: !!host,
       hostTag: host ? host.tagName.toLowerCase() : null,
       hostOverflowX: host ? getComputedStyle(host).overflowX : null,
@@ -133,6 +133,7 @@ async function expectScrollHost(page, sel, { reachable = true } = {}) {
   const h = await auditScrollHost(page, sel);
   const detail = `${sel}：${JSON.stringify(h)}`;
   expect(h.found, detail).toBe(true);
+  if (sel === '#fbGraphic') expect(h.measured, 'The real .fbd content must be measured').toBe('.fbd');
   expect(h.hostFound, `${sel} 缺少 overflow 宿主：${detail}`).toBe(true);
   expect(['auto', 'scroll'], detail).toContain(h.hostOverflowX);
   expect(h.hostLeft, detail).toBeGreaterThanOrEqual(-EPS);
